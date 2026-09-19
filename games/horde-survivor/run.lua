@@ -760,17 +760,7 @@ function run:updateEnemies(dt)
 
         e.shootTimer = (e.shootTimer or 0) - dt
         if e.shootTimer <= 0 and dist < preferred * 1.6 then
-          e.shootTimer = C.get(key .. "shootCooldown")
-          local sx, sy = normalise(dx, dy)
-          self.enemyShots[#self.enemyShots + 1] = {
-            x = e.x, y = e.y,
-            vx = sx * C.get(key .. "shotSpeed"),
-            vy = sy * C.get(key .. "shotSpeed"),
-            radius = C.get(key .. "shotRadius"),
-            damage = C.get(key .. "shotDamage")
-              * run.waveScale(self.wave, p.level).damage,
-            life = C.get(key .. "shotLife"), source = e.def.name,
-          }
+          self:fireEnemyShot(e, key, dx, dy)
         end
 
       elseif e.behaviour == "charge" then
@@ -813,6 +803,13 @@ function run:updateEnemies(dt)
         local desiredY = ny * math.max(-e.speed, math.min(e.speed, radial)) + tangentY * orbitSpeed
         e.vx = e.vx + (desiredX - e.vx) * math.min(1, dt * 5)
         e.vy = e.vy + (desiredY - e.vy) * math.min(1, dt * 5)
+
+        -- Orbiting alone threatens nothing: it holds its radius, so it never
+        -- makes contact and the ring is just scenery. It shoots across it.
+        e.shootTimer = (e.shootTimer or 0) - dt
+        if e.shootTimer <= 0 then
+          self:fireEnemyShot(e, key, dx, dy)
+        end
       end
 
       e.x = e.x + e.vx * dt
@@ -888,7 +885,40 @@ function run:updateEnemyShots(dt)
   self.enemyShots = alive
 end
 
+--- One enemy shot, aimed down (dx, dy). Shared by every behaviour that
+-- fires, so a shot is the same thing whoever sent it.
+function run:fireEnemyShot(e, key, dx, dy)
+  e.shootTimer = C.get(key .. "shootCooldown")
+  local sx, sy = normalise(dx, dy)
+  local speed = C.get(key .. "shotSpeed")
+  self.enemyShots[#self.enemyShots + 1] = {
+    x = e.x, y = e.y,
+    vx = sx * speed, vy = sy * speed,
+    radius = C.get(key .. "shotRadius"),
+    damage = C.get(key .. "shotDamage")
+      * run.waveScale(self.wave, self.player.level).damage,
+    life = C.get(key .. "shotLife"), source = e.def.name,
+  }
+end
+
 -- --------------------------------------------------------------- targeting
+
+--- Where to aim to hit a moving target. Firing at where something *is* only
+-- works while it is coming towards you: anything crossing your line has left
+-- by the time the shot arrives, which is why orbiters were unhittable.
+-- Iterated, because the flight time depends on the point it solves for.
+function run:aimPoint(target, fromX, fromY, projectileSpeed)
+  local lead = C.values.player.aimLead or 0
+  if lead <= 0 or projectileSpeed <= 0 then return target.x, target.y end
+  local ax, ay = target.x, target.y
+  for _ = 1, 3 do
+    local dx, dy = ax - fromX, ay - fromY
+    local flight = math.sqrt(dx * dx + dy * dy) / projectileSpeed
+    ax = target.x + (target.vx or 0) * flight * lead
+    ay = target.y + (target.vy or 0) * flight * lead
+  end
+  return ax, ay
+end
 
 function run:nearestEnemy(x, y, maxRange)
   local best, bestDist = nil, (maxRange or 1e9) ^ 2
@@ -912,20 +942,21 @@ function run:fireWeapon(weapon, dt)
   local area = self:playerStat("areaMult")
 
   if weapon.def.kind == "projectile" then
-    local target, dist = self:nearestEnemy(p.x, p.y, 260)
+    local speed = run.weaponValue(id, "speed", level)
+      * C.values.player.projectileSpeedMult
+    local target = self:nearestEnemy(p.x, p.y, 260)
     local dirX, dirY
     if weapon.def.targeting == "heading" then
       dirX, dirY = p.facingX, p.facingY
     elseif target then
-      dirX, dirY = normalise(target.x - p.x, target.y - p.y)
+      local ax, ay = self:aimPoint(target, p.x, p.y, speed)
+      dirX, dirY = normalise(ax - p.x, ay - p.y)
     end
     weapon.target = target
     if not dirX then return false end
 
     local count = math.max(1, math.floor(run.weaponValue(id, "count", level) + 0.5))
     local spread = math.rad(run.weaponValue(id, "spread", level) or 0)
-    local speed = run.weaponValue(id, "speed", level)
-      * C.values.player.projectileSpeedMult
     local baseAngle = math.atan2(dirY, dirX)
 
     for i = 1, count do

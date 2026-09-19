@@ -41,7 +41,8 @@ retired, update it here too.
 | **Run state** | Which phase a run is in: `playing`, `shop`, `dead`, `won`. | `run.STATE` |
 | **Wave** | The unit of escalation, and a fixed block of time — **15 seconds** by default, not a batch of enemies you clear. Nothing but the clock advances it. The wave number is both the player's progress and its position on the difficulty curve: a run is always `durationMinutes * 60 / waveSeconds` waves, numbered from 1, with no offset between the two. | `run.waveSeconds`, `run:waveCount`, `content.unlockedAt` |
 | **Enemy** / **Weapon** | Content definitions declared as data tables with typed field specs, looked up by id. | `content.enemies`, `content.weapons`, `content.enemyById`, `content.weaponById` |
-| **Behaviour** | An enemy's movement/attack pattern, declared as a field on the enemy definition. | `content.behaviourFields` |
+| **Behaviour** | An enemy's movement/attack pattern, declared as a field on the enemy definition. Shooting is a shared routine, not a behaviour: any behaviour that declares the shot fields fires the same shot. | `content.behaviourFields`, `run:fireEnemyShot` |
+| **Aim prediction** | How far a weapon leads a moving target. Firing at where an enemy *is* only works while it is coming towards you; anything crossing your line has left by the time the shot lands. | `player.aimLead`, `run:aimPoint` |
 | **LP** | The levelling currency dropped by kills — this game's XP. Spent on nothing; it accrues toward the next level. Distinct from gold. | `run.player.lp`, `level.baseRequirement`, `scale.lpPerWave` |
 | **Gold** | The shop currency, earned per wave cleared and from drops. Spent on weapons, upgrades and rerolls. | `run:addGold`, `player.goldFind`, `economy.*` |
 | **Pickup** | A dropped item on the ground, tagged by `kind` (`lp`, `gold`, `heal`). Flies to the player inside the pickup radius; gold and health expire, LP never does. | `pk.kind` in `run.lua` |

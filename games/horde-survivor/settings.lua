@@ -74,6 +74,10 @@ function M.register()
   register("Player", "Movement", 20, {
     { key = "player.moveSpeed", label = "Move speed", type = "number",
       default = 82, min = 10, max = 400, unit = "px/s" },
+    { key = "player.aimLead", label = "Aim prediction", type = "number",
+      default = 1, min = 0, max = 1, format = "%.2f",
+      help = "How far weapons lead a moving target. At zero they fire at "
+        .. "where it is, which never hits anything crossing your line." },
     { key = "player.accel", label = "Acceleration", type = "number",
       default = 1400, min = 100, max = 6000, unit = "px/s2",
       help = "How fast the player reaches top speed. High feels instant." },

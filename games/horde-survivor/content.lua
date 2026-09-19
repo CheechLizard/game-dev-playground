@@ -45,6 +45,13 @@ content.behaviourFields = {
   orbit = {
     { name = "orbitRadius", label = "Orbit radius", type = "number", min = 10, max = 200, order = 20, unit = "px" },
     { name = "orbitSpeed",  label = "Orbit speed",  type = "number", min = 0,  max = 400, order = 21, unit = "px/s" },
+    -- Same field names as the shoot behaviour, because it is the same shot:
+    -- one firing routine reads these whichever behaviour owns them.
+    { name = "shootCooldown", label = "Shot cooldown", type = "number", min = 0.2, max = 8, order = 22, unit = "s", format = "%.2f" },
+    { name = "shotSpeed",     label = "Shot speed",    type = "number", min = 10, max = 400, order = 23, unit = "px/s" },
+    { name = "shotDamage",    label = "Shot damage",   type = "number", min = 0,  max = 100, order = 24 },
+    { name = "shotRadius",    label = "Shot radius",   type = "number", min = 1,  max = 12,  order = 25, unit = "px" },
+    { name = "shotLife",      label = "Shot lifetime", type = "number", min = 0.1, max = 8,  order = 26, unit = "s", format = "%.2f" },
   },
 }
 
@@ -107,10 +114,12 @@ content.enemies = {
   {
     id = "orbiter", name = "Orbiter", shape = "ring", palette = "accent",
     behaviour = "orbit",
-    blurb = "Circles you at range and closes in slowly.",
+    blurb = "Circles you at range and fires across the ring.",
     tune = { hp = 34, speed = 40, damage = 12, radius = 5, lp = 4,
              goldChance = 0.22, hpChance = 0.03, knockback = 0.9, weight = 3,
-             orbitRadius = 64, orbitSpeed = 120 },
+             orbitRadius = 64, orbitSpeed = 120,
+             shootCooldown = 2.4, shotSpeed = 95, shotDamage = 7,
+             shotRadius = 2, shotLife = 3 },
   },
 }
 
