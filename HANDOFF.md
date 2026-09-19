@@ -4,6 +4,41 @@ Context from the session that built this, for whoever picks it up next.
 `README.md` covers how the thing works; this covers *why it is the way it is*,
 what is unverified, and what is still open.
 
+## Getting set up from nothing
+
+The work is on the branch `claude/dreamy-euler-0kgm7h`, not on `main`.
+
+```bash
+# 1. LÖVE 11.x
+brew install --cask love                  # macOS
+winget install LoveDevelopers.LOVE        # Windows
+sudo apt install love                     # Debian/Ubuntu
+
+# 2. the code
+git clone https://github.com/CheechLizard/game-dev-playground.git
+cd game-dev-playground
+git checkout claude/dreamy-euler-0kgm7h
+
+# 3. run it, from the repo root
+love .
+```
+
+On macOS the cask does not always put `love` on PATH; it lives at
+`/Applications/love.app/Contents/MacOS/love`.
+
+Launching as `love .` from the repo root is not stylistic. The shared framework
+resolves against the root, and profile saves are written back into
+`config/profiles/` so they land in git rather than in an app-support directory.
+`love games/horde-survivor` will fail.
+
+Lua 5.1 is optional but useful — it runs the tests and the balance harness with
+no display:
+
+```bash
+lua5.1 tools/test.lua        # 96 tests, ~5s
+lua5.1 tools/balance.lua --runs 5
+```
+
 ## Do this first
 
 **Nothing here has ever been rendered.** It was built in a cloud container with
