@@ -1,9 +1,13 @@
 {
   "description": "Schema defaults. Empty on purpose: profiles store only overrides.",
   "name": "default",
-  "savedAt": "2026-09-19T21:33:47Z",
+  "savedAt": "2026-09-19T22:38:48Z",
   "values": {
+    "enemy.brute.chargeRange": 129.64285714286,
+    "enemy.brute.chargeSpeed": 232.67857142857,
+    "enemy.grunt.speed": 65.714285714286,
     "enemy.lancer.chargeSpeed": 234,
-    "enemy.spitter.shootCooldown": 4.9
+    "enemy.spitter.shootCooldown": 4.9,
+    "enemy.swarmer.speed": 62.964285714286
   }
 }
