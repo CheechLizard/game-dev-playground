@@ -54,6 +54,8 @@ retired, update it here too.
 | **Range** | The inspection level with one room per weapon. `F6`. | `sandbox.new("range")` |
 | **Room** / **Cage** | One cell of a sandbox level's grid. A room is live only while the player is standing in it. | `sandbox.rooms`, `roomAt` |
 | **Specimen** | The still sprite shown in an idle room, so you can see what lives there without walking in. Hidden once the room goes live. | `sandbox.draw` |
+| **Placard** | The stats panel for a sandbox room. Appears when you stand within `sandbox.previewRange` of a room and hides once you step inside, where the room itself is the information. | `sandbox.preview`, `nearestRoom` |
+| **Invulnerable** | A standing immunity, as the sandbox levels grant. Distinct from the brief post-hit window the player blinks through: a permanent state must not blink, or the flicker reads as a fault. | `player.invulnerable` vs `player.iframe` |
 | **Underlay** | An optional world-space layer drawn between the background and the entities. The sandbox rooms use it. | `render.underlay` |
 | **Seeded rng** | The run's own generator, so a given seed reproduces a run exactly in both tests and the game. Deliberately not `math.random`. | `makeRng` in `run.lua` |
 

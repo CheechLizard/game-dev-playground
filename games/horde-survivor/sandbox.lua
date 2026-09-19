@@ -55,6 +55,22 @@ local function roomAt(rooms, x, y)
   return nil
 end
 
+--- The room nearest the point but not containing it, within `range`.
+-- Distance is measured to the cage wall, not its centre, so a wide cage does
+-- not read as further away than a narrow one at the same standing distance.
+local function nearestRoom(rooms, x, y, range)
+  local best, bestDist
+  for _, room in ipairs(rooms) do
+    local dx = math.max(room.x - x, 0, x - (room.x + room.w))
+    local dy = math.max(room.y - y, 0, y - (room.y + room.h))
+    local dist = math.sqrt(dx * dx + dy * dy)
+    if dist <= range and (not bestDist or dist < bestDist) then
+      best, bestDist = room, dist
+    end
+  end
+  return best
+end
+
 local function randomPointIn(room, rng, margin)
   margin = margin or 18
   return room.x + margin + rng.next() * (room.w - margin * 2),
@@ -131,14 +147,22 @@ function sandbox.update(s, dt, moveX, moveY)
   local r = s.run
   local c = config.values
 
+  -- A standing flag, not a pumped iframe. Refreshing iframe every frame kept
+  -- the player permanently inside its post-hit blink, which reads as a fault.
+  r.player.invulnerable = c.sandbox.invulnerable
   if c.sandbox.invulnerable then
-    r.player.iframe = math.max(r.player.iframe, 0.2)
     r.player.hp = r:playerStat("maxHp")
     r.state = runModule.STATE.PLAYING
   end
 
   local was = s.active
   s.active = roomAt(s.rooms, r.player.x, r.player.y)
+
+  -- Read the placard from the corridor; step inside and it gets out of the
+  -- way, because once the room is live the thing itself is the information.
+  s.preview = (not s.active)
+    and nearestRoom(s.rooms, r.player.x, r.player.y, c.sandbox.previewRange)
+    or nil
 
   -- Leaving a room clears it: the zoo should be quiet when you are in the
   -- corridor, or every cage you have visited follows you around.
@@ -301,7 +325,7 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   local label = (s.mode == "zoo" and "weapon: " or "spawning: ") .. sandbox.selectionName(s)
   g.printf(label, ox, oy + pad, viewW - pad, "right")
 
-  local room = s.active
+  local room = s.preview
   if not room then return end
 
   local def = room.def
@@ -377,6 +401,10 @@ function sandbox.registerSettings(schema)
       { key = "sandbox.invulnerable", label = "Invulnerable", type = "bool",
         default = true,
         help = "Off to feel how hard a room actually hits." },
+      { key = "sandbox.previewRange", label = "Placard range", type = "number",
+        default = 40, min = 0, max = 200, unit = "px",
+        help = "How close to a room you stand before its details appear. "
+          .. "They hide again once you step inside." },
     },
   }
 end

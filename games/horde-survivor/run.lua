@@ -98,6 +98,10 @@ function run:reset()
     lpNext = c.level.baseRequirement,
     gold = c.economy.startingGold,
     iframe = 0,
+    -- Permanent invulnerability, as the sandbox levels use. Distinct from
+    -- iframe, which is the brief window after a hit that the player blinks
+    -- through: a standing state should not blink, there is no news in it.
+    invulnerable = false,
     facingX = 0, facingY = 1,
     hitFlash = 0,
     -- Level-up bonuses accumulate here rather than mutating config, so the
@@ -577,7 +581,9 @@ end
 
 function run:damagePlayer(amount, sourceName)
   local p = self.player
-  if p.iframe > 0 or self.state ~= STATE.PLAYING then return false end
+  if p.invulnerable or p.iframe > 0 or self.state ~= STATE.PLAYING then
+    return false
+  end
 
   local reduced = math.max(1, amount - C.values.player.armor)
   p.hp = p.hp - reduced
