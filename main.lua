@@ -35,12 +35,6 @@ local function pickGame()
   return DEFAULT_GAME
 end
 
-local function rebuildCanvas()
-  canvas = love.graphics.newCanvas(config.get("render.width"), config.get("render.height"))
-  canvas:setFilter("nearest", "nearest")
-  recomputeLetterbox()
-end
-
 local function recomputeLetterbox()
   local ww, wh = love.graphics.getDimensions()
   local cw, ch = canvas:getDimensions()
@@ -48,6 +42,12 @@ local function recomputeLetterbox()
   scale = math.max(1, math.floor(math.min(ww / cw, wh / ch)))
   offsetX = math.floor((ww - cw * scale) / 2)
   offsetY = math.floor((wh - ch * scale) / 2)
+end
+
+local function rebuildCanvas()
+  canvas = love.graphics.newCanvas(config.get("render.width"), config.get("render.height"))
+  canvas:setFilter("nearest", "nearest")
+  recomputeLetterbox()
 end
 
 function love.load()
