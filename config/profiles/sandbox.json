@@ -1,0 +1,16 @@
+{
+  "description": "Short invulnerable run with every debug overlay on, for inspecting behaviour.",
+  "name": "sandbox",
+  "values": {
+    "debug.godMode": true,
+    "debug.showRunState": true,
+    "overlay.colliders": true,
+    "overlay.enemyState": true,
+    "overlay.hitAreas": true,
+    "overlay.pickupRange": true,
+    "overlay.playerAim": true,
+    "perf.show": true,
+    "run.durationMinutes": 3,
+    "run.waveSeconds": 20
+  }
+}

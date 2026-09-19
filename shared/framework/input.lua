@@ -1,0 +1,106 @@
+-- Input: WASD/arrows on the keyboard, left thumbstick on a gamepad.
+-- Whichever moved most recently wins, so switching mid-run just works.
+
+local input = {}
+
+input.deadzone = 0.22
+input.source = "keyboard"
+input.gamepad = nil
+
+local pressed = {}   -- edge-triggered actions consumed this frame
+
+function input.init()
+  if not love or not love.joystick then return end
+  local pads = love.joystick.getJoysticks()
+  for _, pad in ipairs(pads) do
+    if pad:isGamepad() then input.gamepad = pad break end
+  end
+end
+
+function input.gamepadAdded(pad)
+  if pad:isGamepad() and not input.gamepad then input.gamepad = pad end
+end
+
+function input.gamepadRemoved(pad)
+  if input.gamepad == pad then
+    input.gamepad = nil
+    input.init()
+  end
+end
+
+local function keyboardAxis()
+  if not (love and love.keyboard) then return 0, 0 end
+  local k = love.keyboard.isDown
+  local x = (k("d") or k("right")) and 1 or 0
+  x = x - ((k("a") or k("left")) and 1 or 0)
+  local y = (k("s") or k("down")) and 1 or 0
+  y = y - ((k("w") or k("up")) and 1 or 0)
+  return x, y
+end
+
+local function padAxis()
+  local pad = input.gamepad
+  if not pad or not pad:isConnected() then return 0, 0 end
+  local x = pad:getGamepadAxis("leftx") or 0
+  local y = pad:getGamepadAxis("lefty") or 0
+  local mag = math.sqrt(x * x + y * y)
+  if mag < input.deadzone then return 0, 0 end
+  -- Rescale past the deadzone so slow movement is still reachable.
+  local scaled = math.min(1, (mag - input.deadzone) / (1 - input.deadzone))
+  return x / mag * scaled, y / mag * scaled
+end
+
+--- Movement vector, magnitude clamped to 1.
+function input.move()
+  local px, py = padAxis()
+  if px ~= 0 or py ~= 0 then
+    input.source = "gamepad"
+    return px, py
+  end
+  local kx, ky = keyboardAxis()
+  if kx ~= 0 or ky ~= 0 then
+    input.source = "keyboard"
+    local mag = math.sqrt(kx * kx + ky * ky)
+    return kx / mag, ky / mag
+  end
+  return 0, 0
+end
+
+--- Record an edge-triggered action for this frame.
+function input.press(action)
+  pressed[action] = true
+end
+
+--- Consume an edge-triggered action. Returns true at most once per press.
+function input.consume(action)
+  if pressed[action] then
+    pressed[action] = nil
+    return true
+  end
+  return false
+end
+
+function input.clear()
+  pressed = {}
+end
+
+--- Map raw keys and gamepad buttons onto named actions.
+local KEY_ACTIONS = {
+  escape = "cancel", space = "confirm", ["return"] = "confirm",
+  r = "restart", p = "pause",
+}
+local PAD_ACTIONS = {
+  a = "confirm", b = "cancel", start = "pause", back = "restart",
+}
+
+function input.keypressed(key)
+  local action = KEY_ACTIONS[key]
+  if action then input.press(action) end
+end
+
+function input.gamepadpressed(_, button)
+  local action = PAD_ACTIONS[button]
+  if action then input.press(action) end
+end
+
+return input

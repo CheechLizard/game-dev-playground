@@ -1,0 +1,5 @@
+{
+  "description": "Schema defaults. Empty on purpose: profiles store only overrides.",
+  "name": "default",
+  "values": {}
+}

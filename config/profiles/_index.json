@@ -1,0 +1,8 @@
+{
+  "profiles": [
+    "default",
+    "sandbox",
+    "brutal"
+  ],
+  "startup": "default"
+}

@@ -1,0 +1,175 @@
+# game-dev-playground
+
+A workspace for prototyping game ideas, with a shared framework that every game
+here gets for free: an in-game editor, a performance overlay, debug-draw layers,
+and config profiles.
+
+```
+love .                      # run the default game
+love . --game horde-survivor
+lua5.1 tools/test.lua       # headless tests (no LÖVE needed)
+lua5.1 tools/balance.lua --runs 5
+```
+
+Run from the repo root. That matters: config profiles are written back into
+`config/profiles/` so they can be diffed and committed, which only works when
+the working directory is the repo.
+
+## Layout
+
+```
+main.lua               launcher: boots the framework, then the game
+conf.lua               window and LÖVE module setup
+shared/framework/      schema, config, profiles, editor, perf, debugdraw, ui, input
+shared/lib/            json, filesystem shim
+games/horde-survivor/  the first game
+config/profiles/       saved config profiles (JSON, committed)
+tools/                 headless tests and the balance harness
+```
+
+## Keys
+
+| Key | |
+|---|---|
+| `F1` | editor |
+| `F2` | performance overlay |
+| `F3` | collider overlay |
+| `F4` | master switch for all debug overlays |
+| `WASD` / left stick | move |
+| `R` | restart run |
+
+Firing is automatic.
+
+## The editor
+
+`F1` opens a panel with a page per system. **Every page, section and control is
+generated from the schema** — there is no second list of settings anywhere. Add
+a setting to the schema and it appears; delete it and it disappears from the
+editor *and* is pruned from saved profiles. That is the whole point of the
+design: the editor cannot drift out of sync with the code, because it has no
+independent knowledge of what exists.
+
+Declare a setting in `games/<game>/settings.lua`:
+
+```lua
+schema.register{
+  page = "Player", section = "Movement", order = 20,
+  settings = {
+    { key = "player.moveSpeed", label = "Move speed", type = "number",
+      default = 82, min = 10, max = 400, unit = "px/s",
+      help = "Shown under the control when Show help is on." },
+  },
+}
+```
+
+Read it in hot code through the nested tree, which costs two table lookups:
+
+```lua
+local speed = config.values.player.moveSpeed
+```
+
+Types are `number`, `int`, `bool`, `enum`, `color` and `string`. Numeric
+settings must declare `min` and `max` — the schema refuses to register without
+them, because the editor cannot draw a control for an unbounded number. Mark a
+setting `live = false` if it only takes effect on a new run; the editor labels
+it `*` and shows a "restart run to apply" banner.
+
+**Content-derived settings.** Enemies and weapons are declared as data in
+`content.lua`, and `settings.lua` walks that data to generate a settings section
+per enemy and per weapon. Adding an enemy gives it a full editor section with no
+extra work; deleting one takes its settings with it. The same generation drives
+the per-enemy "Spawn 10 of these" debug buttons.
+
+**Actions** are buttons rather than values, registered from game code because
+they act on the live run:
+
+```lua
+editor.action{ page = "Debug", section = "Run", label = "Next wave now",
+  fn = function() currentRun.waveTime = 1e9 end }
+```
+
+Values go in the schema. Actions go in `editor.action`. Keeping that split is
+what keeps the IA clean.
+
+## Config profiles
+
+A profile is a named set of overrides in `config/profiles/<name>.json`. Profiles
+store **only the difference from the schema defaults**, which has two
+consequences worth relying on:
+
+- adding a new setting never invalidates an existing profile — it inherits the
+  new default;
+- deleting a setting leaves a stale key, which the editor reports on the
+  Profiles page with a **Prune** button.
+
+`config/profiles/_index.json` records the profile order and which one loads at
+launch. Set it from the editor's Profiles page with the `launch` button.
+
+Shipped profiles: `default` (nothing overridden), `sandbox` (short invulnerable
+run, all overlays on), `brutal` (steeper scaling, less gold).
+
+## Overlays
+
+Debug layers are registered with `debugdraw.register` and become bool settings
+on the Overlays page, so they save into profiles like anything else. Guard hot
+draw code on a single table lookup:
+
+```lua
+if dd.on.colliders then dd.circle("colliders", x, y, r) end
+```
+
+## Headless testing
+
+`run.lua` contains no `love.graphics` calls and takes a movement vector rather
+than reading input, so an entire run can be simulated with no window. That makes
+balance measurable:
+
+```
+lua5.1 tools/balance.lua --runs 8
+lua5.1 tools/balance.lua --profile brutal --runs 5
+lua5.1 tools/balance.lua --bubble 70       # how close the scripted pilot plays
+lua5.1 tools/balance.lua --csv out.csv
+```
+
+The pilot is a scripted approximation, not a good player. Its `--bubble`
+parameter (how much personal space it keeps) swings results a lot, so **sweep it
+before trusting any balance verdict** — a conclusion that only holds at one
+bubble size is a fact about the bot, not about the game.
+
+## The horde survivor
+
+15-minute run, 60-second waves, shop every 3 waves. Enemies spawn off-screen in
+pulses and advance on the player; contact costs HP. Kills drop LP, which the
+player vacuums up to level, and levelling grants an automatic stat bump. Gold
+buys weapons and upgrades in the shop.
+
+**Enemies scale on wave index, not on player level.** This is deliberate:
+scaling enemies to player level makes ignoring LP a viable strategy, which
+fights the core loop of the genre. `scale.playerLevelWeight` (default `0`) turns
+the other behaviour on if you want to feel it.
+
+The difficulty model is a race between two rates, and it is easy to break:
+
+- **spawn rate** grows through the run (`wave.countStart/End`, `wave.tickStart/End`)
+- **kill rate** is player DPS divided by enemy HP
+
+If enemy HP scales faster than player damage, kill rate *falls* every wave while
+spawn rate climbs, and the run becomes unwinnable rather than hard. Keep
+`scale.hpPerWave` below the rate player damage grows, and check both pages
+together after changing either.
+
+### Known balance state
+
+Measured with the scripted pilot over several seeds and play styles: runs
+currently reach **wave 7-9 of 15**, with occasional full survivals. It is a
+playable starting point, not a balanced game — the numbers are all in the editor
+and want a human playing them.
+
+Open issues worth a look:
+
+- **The Blaster does ~85% of all damage** in every configuration tested. It is
+  the starting weapon, it is always in range, and its upgrades are the cheapest
+  thing in the shop, so the greedy buyer never diversifies. Either the other
+  weapons need to be more attractive or the Blaster needs to fall off.
+- **Static Field barely contributes** (<4%). Area damage should be the horde
+  answer late, and currently is not.

@@ -1,0 +1,12 @@
+# LÖVE / build artefacts
+*.love
+build/
+
+# Balance harness output
+*.csv
+
+# Editors and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
