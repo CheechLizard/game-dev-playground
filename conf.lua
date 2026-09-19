@@ -1,5 +1,18 @@
+-- LÖVE keys the save directory to t.identity -- to the string, not to the
+-- checkout. A fixed identity means every worktree shares one save folder, so
+-- two parallel agents capturing screenshots silently overwrite each other's
+-- PNGs. Deriving it from the source directory keeps parallel checkouts apart.
+-- The canonical clone keeps the plain name, so its existing saves still resolve.
+local function identity()
+  local dir = (love.filesystem.getSource() or ""):match("([^/\\]+)[/\\]*$")
+  if not dir or dir == "game-dev-playground" then
+    return "game-dev-playground"
+  end
+  return "game-dev-playground-" .. dir:gsub("[^%w%-_]", "-")
+end
+
 function love.conf(t)
-  t.identity = "game-dev-playground"
+  t.identity = identity()
   t.version = "11.4"
   t.console = false
 

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(luajit tools/test.lua)",
+      "Bash(luajit tools/test.lua:*)",
+      "Bash(luajit tools/balance.lua:*)",
+      "Bash(luajit tools/simsuite.lua:*)",
+      "Bash(tools/worktree.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git worktree list:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)"
+    ]
+  }
+}

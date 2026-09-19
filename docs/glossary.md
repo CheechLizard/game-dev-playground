@@ -60,3 +60,11 @@ retired, update it here too.
 | **Headless** | Running simulation or tests with no LÖVE window, under a Lua 5.1-compatible interpreter. Use `luajit`: Homebrew dropped `lua@5.1`, and LuaJIT is the VM LÖVE itself runs. | `tools/test.lua` |
 | **Sim suite** | Headless driver that plays runs to completion for balance checking. | `tools/simsuite.lua` |
 | **Balance harness** | Batch runner over the sim suite, reporting aggregate outcomes across many runs. | `tools/balance.lua --runs N` |
+
+## Workflow
+
+| Term | Meaning | Code |
+|---|---|---|
+| **Integration branch** | `main`. The stable base every worktree branches from and every change merges back into. | — |
+| **Worktree** | An additional checkout for parallel work, created as a *sibling* of the repo — never inside it, since `love .` treats the whole directory tree as the game source. | `tools/worktree.sh` |
+| **Save identity** | The LÖVE save-directory name. Derived from the checkout's directory name rather than fixed, so parallel worktrees do not share one screenshot folder and overwrite each other's captures. | `conf.lua`, `t.identity` |

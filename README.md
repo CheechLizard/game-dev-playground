@@ -25,7 +25,7 @@ shared/assets/fonts/   pixel fonts used by every screen-space surface
 shared/lib/            json, filesystem shim
 games/horde-survivor/  the first game, plus the zoo and range levels
 config/profiles/       saved config profiles (JSON, committed)
-tools/                 headless tests and the balance harness
+tools/                 headless tests, the balance harness, the worktree helper
 ```
 
 ## Keys
