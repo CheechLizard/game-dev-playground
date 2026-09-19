@@ -14,6 +14,11 @@ local config = require("framework.config")
 
 local profiles = {}
 
+-- Autosave state. Declared here rather than beside the autosave functions
+-- below: profiles.load is defined earlier in this file and touches suppress,
+-- and a local declared further down is not in scope at that point.
+local dirty, sinceChange, suppress = false, 0, 0
+
 profiles.dir = "config/profiles"
 profiles.list = {}        -- ordered array of profile names
 profiles.active = nil     -- currently loaded profile name
@@ -98,6 +103,14 @@ end
 --- Load a profile over the current values. Resets everything to schema
 -- defaults first, so loading is absolute rather than cumulative.
 function profiles.load(name)
+  suppress = suppress + 1
+  local ok, a, b = pcall(profiles.applyLoad, name)
+  suppress = suppress - 1
+  if not ok then error(a, 0) end
+  return a, b
+end
+
+function profiles.applyLoad(name)
   config.resetAll()
   profiles.orphans = {}
 
@@ -205,9 +218,49 @@ function profiles.pruneOrphans()
 end
 
 --- Called once at boot: find the profiles, then load the startup one.
+-- ---------------------------------------------------------------- autosave
+--
+-- Edits live in memory until a profile is written, which means a session of
+-- tuning is lost by quitting without pressing Save. Autosave closes that gap:
+-- any change marks the active profile dirty and it is written once the edits
+-- stop, rather than on every frame of a slider drag.
+
+function profiles.registerSettings()
+  schema.register{
+    page = "UI", section = "Profiles", order = 85, sectionOrder = 30,
+    settings = {
+      { key = "profiles.autosave", label = "Autosave", type = "bool",
+        default = true,
+        help = "Write changes back to the active profile automatically." },
+      { key = "profiles.autosaveDelay", label = "Autosave delay", type = "number",
+        default = 0.8, min = 0.1, max = 10, unit = "s", format = "%.2f",
+        help = "Quiet time after the last change before writing." },
+    },
+  }
+end
+
+--- Tick the autosave timer. Called once per frame by the launcher.
+function profiles.update(dt)
+  if not dirty then return end
+  local c = config.values.profiles
+  if not (c and c.autosave) then return end
+  sinceChange = sinceChange + dt
+  if sinceChange < (c.autosaveDelay or 0.8) then return end
+  dirty = false
+  profiles.save(profiles.active or "default")
+end
+
 function profiles.init()
   profiles.refresh()
   profiles.load(profiles.startup or "default")
+
+  config.listen(function(key)
+    -- A nil key is a rebuild or a profile load, not an edit. Loading a
+    -- profile also sets every one of its keys, so it is suppressed outright
+    -- or the load would immediately dirty what it just read.
+    if key == nil or suppress > 0 then return end
+    dirty, sinceChange = true, 0
+  end)
 end
 
 return profiles

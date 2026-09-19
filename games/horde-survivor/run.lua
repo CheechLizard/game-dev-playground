@@ -114,6 +114,7 @@ function run:reset()
   }
 
   self.enemies = {}
+  self.pendingSpawns = {}
   self.projectiles = {}
   self.enemyShots = {}
   self.pickups = {}
@@ -233,6 +234,36 @@ end
 
 -- ------------------------------------------------------------------ spawn
 
+--- Queue a spawn behind its warning ring. Returns nothing: the enemy does
+-- not exist yet. `onSpawn` is called with it when it does. A zero warning
+-- spawns immediately, which is what the headless tests and a telegraph of 0
+-- both want.
+function run:queueSpawn(id, x, y, onSpawn)
+  local warning = C.values.wave.spawnTelegraph or 0
+  if warning <= 0 then
+    local e = self:spawnEnemy(id, x, y)
+    if e and onSpawn then onSpawn(e) end
+    return
+  end
+  self.pendingSpawns[#self.pendingSpawns + 1] = {
+    id = id, x = x, y = y, t = warning, total = warning, onSpawn = onSpawn,
+  }
+end
+
+function run:updatePendingSpawns(dt)
+  local waiting = {}
+  for _, s in ipairs(self.pendingSpawns) do
+    s.t = s.t - dt
+    if s.t > 0 then
+      waiting[#waiting + 1] = s
+    else
+      local e = self:spawnEnemy(s.id, s.x, s.y)
+      if e and s.onSpawn then s.onSpawn(e) end
+    end
+  end
+  self.pendingSpawns = waiting
+end
+
 function run:spawnEnemy(id, x, y)
   local def = content.enemyById[id]
   if not def then return nil end
@@ -320,11 +351,30 @@ function run:updateSpawning(dt)
   if #self.enemies >= c.maxAlive then return end
 
   local ids = content.unlockedAt(self.wave)
-  local count = math.floor(perPulse + self.rng.next())
-  for _ = 1, count do
-    if #self.enemies >= c.maxAlive then break end
+  local budget = math.floor(perPulse + self.rng.next())
+  local spawned = 0
+
+  -- A pick spawns a whole pack around one point, so a pack arrives together
+  -- instead of trickling in one at a time from opposite edges. The budget is
+  -- per pulse, so the last pack may overshoot it; a half pack is not a pack.
+  -- Pending spawns count against the cap: they are enemies that have been
+  -- paid for and are on their way.
+  local function atCap()
+    return #self.enemies + #self.pendingSpawns >= c.maxAlive
+  end
+
+  while spawned < budget do
+    if atCap() then break end
+    local id = pickWeighted(self.rng, ids)
+    local pack = math.max(1, math.floor(C.get("enemy." .. id .. ".pack") or 1))
     local x, y = self:offscreenPoint()
-    self:spawnEnemy(pickWeighted(self.rng, ids), x, y)
+    for _ = 1, pack do
+      if atCap() then break end
+      local jx = x + (self.rng.next() - 0.5) * c.packSpread
+      local jy = y + (self.rng.next() - 0.5) * c.packSpread
+      self:queueSpawn(id, jx, jy)
+      spawned = spawned + 1
+    end
   end
 end
 
@@ -1046,6 +1096,7 @@ function run:update(dt, moveX, moveY)
   -- weapons. Everything else behaves exactly as it does in a real run, which
   -- is the point: what you test there is what you get.
   if not self.sandbox then self:updateSpawning(dt) end
+  self:updatePendingSpawns(dt)
   self:updateEnemies(dt)
   self:separateEnemies(dt)
   self:updateWeapons(dt)

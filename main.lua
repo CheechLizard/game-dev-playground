@@ -65,6 +65,7 @@ function love.load()
   -- Font settings are framework-level, so they register alongside the game's.
   fonts.registerSettings()
   ui.registerSettings()
+  profiles.registerSettings()
   game.registerSettings()
   config.build()
   profiles.init()
@@ -88,6 +89,7 @@ function love.update(dt)
   -- Clamp dt so a hitch or a drag of the window does not teleport everything.
   dt = math.min(dt, 1 / 20)
 
+  profiles.update(dt)
   ui.beginFrame()
   perf.push("game.update")
   game.update(dt)

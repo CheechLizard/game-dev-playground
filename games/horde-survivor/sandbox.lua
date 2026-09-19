@@ -171,6 +171,7 @@ function sandbox.update(s, dt, moveX, moveY)
   -- corridor, or every cage you have visited follows you around.
   if was and was ~= s.active then
     r.enemies = {}
+    r.pendingSpawns = {}
     r.enemyShots = {}
     r.projectiles = {}
     r.pickups = {}
@@ -192,11 +193,12 @@ function sandbox.update(s, dt, moveX, moveY)
     local spawnId = (s.mode == "zoo") and s.active.def.id
       or content.enemies[s.selection].id
     s.spawnTimer = (s.spawnTimer or 0) - dt
-    if s.spawnTimer <= 0 and #r.enemies < targetPopulation(s) then
+    local incoming = #r.enemies + #r.pendingSpawns
+    if s.spawnTimer <= 0 and incoming < targetPopulation(s) then
       s.spawnTimer = math.max(0.05, c.sandbox.spawnInterval)
-      local x, y = randomPointIn(s.active, r.rng)
-      local e = r:spawnEnemy(spawnId, x, y)
-      if e then e.cage = s.active end
+      local cage = s.active
+      local x, y = randomPointIn(cage, r.rng)
+      r:queueSpawn(spawnId, x, y, function(e) e.cage = cage end)
     end
   end
 

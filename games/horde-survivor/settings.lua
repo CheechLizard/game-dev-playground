@@ -209,6 +209,14 @@ function M.register()
       help = "Spawn rate and enemy HP both push the same way. Raising either "
         .. "without raising player damage makes the horde outgrow the player's "
         .. "kill rate, which is unwinnable rather than hard." },
+    { key = "wave.spawnTelegraph", label = "Spawn warning", type = "number",
+      default = 0.7, min = 0, max = 3, unit = "s", format = "%.2f",
+      help = "A ring closes on the spot before an enemy appears there, so a "
+        .. "spawn can be walked away from. Zero spawns with no warning." },
+    { key = "wave.packSpread", label = "Pack spread", type = "number",
+      default = 26, min = 0, max = 200, unit = "px",
+      help = "How far apart a pack lands. Wide enough not to overlap, tight "
+        .. "enough to still read as one group." },
     { key = "wave.maxAlive", label = "Max alive", type = "int",
       default = 320, min = 10, max = 2000,
       help = "Hard cap. Spawning stalls rather than tanking the frame rate." },
@@ -308,6 +316,7 @@ function M.register()
     local settings = {}
     for _, field in ipairs(content.enemyFields) do
       local value = def.tune[field.name]
+      if value == nil then value = field.fallback end
       if value ~= nil then
         settings[#settings + 1] = {
           key = "enemy." .. def.id .. "." .. field.name,

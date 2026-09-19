@@ -1,5 +1,9 @@
 {
   "description": "Schema defaults. Empty on purpose: profiles store only overrides.",
   "name": "default",
-  "values": {}
+  "savedAt": "2026-09-19T21:33:47Z",
+  "values": {
+    "enemy.lancer.chargeSpeed": 234,
+    "enemy.spitter.shootCooldown": 4.9
+  }
 }

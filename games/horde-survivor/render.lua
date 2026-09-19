@@ -297,6 +297,19 @@ function render.draw(r)
     dd.cross("pickups", pk.x, pk.y, 5)
   end
 
+  -- Spawn warnings: a ring closing on the spot an enemy is about to occupy,
+  -- so the horde can be avoided rather than only reacted to.
+  for _, s in ipairs(r.pendingSpawns or {}) do
+    local k = (s.total > 0) and math.max(0, s.t / s.total) or 0
+    local base = palette("enemy")
+    local radius = config.get("enemy." .. s.id .. ".radius") + k * 14
+    g.setColor(base[1], base[2], base[3], 0.2 + (1 - k) * 0.6)
+    g.circle("line", s.x, s.y, radius, 14)
+    if k < 0.25 then
+      g.circle("line", s.x, s.y, radius * 0.45, 10)
+    end
+  end
+
   -- Enemies.
   for _, e in ipairs(r.enemies) do
     local base = palette(e.def.palette or "enemy")

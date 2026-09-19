@@ -18,6 +18,7 @@ retired, update it here too.
 | **Listener** | A callback registered against a key, fired when that key's value changes. Used for values needing rebuild work, e.g. `render.width` → `rebuildCanvas`. | `config.listen` |
 | **Restart-pending** | State flagged when a changed setting cannot take effect until relaunch. Surfaced in the editor. | `config.needsRestart` |
 | **Profile** | A named set of overrides stored in the repo as JSON. Stores only values differing from schema defaults, so adding a setting never invalidates an existing profile. | `config/profiles/<name>.json`, `shared/framework/profiles.lua` |
+| **Autosave** | Writes the active profile once edits stop, rather than on every frame of a drag. Without it a session of tuning is lost by quitting without pressing Save. A profile load is suppressed, or loading would immediately dirty what it just read. | `profiles.autosave`, `profiles.update` |
 | **Startup profile** | The profile marked in the index to load at launch, as distinct from the one currently loaded (`active`). | `profiles.startup`, `profiles.active`, `config/profiles/_index.json` |
 | **Orphan** | A key present in a loaded profile but absent from the schema — usually a setting deleted since the profile was saved. Pruned on next save. | `profiles.orphans`, `profiles.pruneOrphans` |
 | **Layer** | One debug-draw overlay (colliders, ranges, spawn rings…). Registered as an ordinary bool setting on the Overlays page, so it appears in the editor and saves into profiles through the same mechanism as everything else. | `dd.register`, `dd.layers` |
@@ -44,6 +45,8 @@ retired, update it here too.
 | **LP** | The levelling currency dropped by kills — this game's XP. Spent on nothing; it accrues toward the next level. Distinct from gold. | `run.player.lp`, `level.baseRequirement`, `scale.lpPerWave` |
 | **Gold** | The shop currency, earned per wave cleared and from drops. Spent on weapons, upgrades and rerolls. | `run:addGold`, `player.goldFind`, `economy.*` |
 | **Pickup** | A dropped item on the ground, tagged by `kind` (`lp`, `gold`, `heal`). Flies to the player inside the pickup radius; gold and health expire, LP never does. | `pk.kind` in `run.lua` |
+| **Pack** | How many of an enemy arrive together. A pick spawns a whole pack clustered around one point, so a pack lands as a group rather than trickling in from opposite edges. Most enemies are loners; the swarmer is not. | `enemy.<id>.pack`, `wave.packSpread` |
+| **Spawn warning** | A ring that closes on the spot before an enemy appears there, so a spawn can be walked away from instead of only reacted to. Pending spawns count against the alive cap: they are already paid for. | `wave.spawnTelegraph`, `run:queueSpawn`, `run.pendingSpawns` |
 | **Elite** | A rolled-up enemy variant: more HP, larger radius, bigger reward. Rolled per spawn against `scale.eliteChance`. | `enemy.elite`, `scale.eliteHpMult`, `scale.eliteRewardMult` |
 | **Shop item** | An offer in the shop, tagged by `kind` (`weapon`, `upgrade`, `heal`). Rerollable for gold. | `kind` in `run.lua:325`, `shop.rerollCost` |
 | **Passive** | A repeatable stat upgrade sold in the shop, as opposed to a weapon. `stat` names a key in `player.bonus`, so a new one needs no new plumbing. Stacks, priced higher each time, capped. | `content.passives`, `run:addPassive`, `player.passives` |

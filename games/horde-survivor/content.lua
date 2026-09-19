@@ -20,6 +20,9 @@ content.enemyFields = {
   { name = "hpChance",   label = "Health drop chance", type = "number", min = 0, max = 1,   order = 7, format = "%.2f" },
   { name = "knockback",  label = "Knockback taken",  type = "number", min = 0,  max = 4,    order = 8, format = "%.2f" },
   { name = "weight",     label = "Spawn weight",     type = "number", min = 0,  max = 20,   order = 9, format = "%.1f" },
+  -- Every enemy has a pack size; most are loners, so the fallback covers them
+  -- rather than repeating "pack = 1" in six tune tables.
+  { name = "pack",       label = "Pack size",       type = "int",    min = 1,   max = 20,   order = 10, fallback = 1 },
 }
 
 -- Behaviour-specific fields, only registered for enemies using that behaviour.
@@ -61,8 +64,11 @@ content.enemies = {
     id = "swarmer", name = "Swarmer", shape = "dot", palette = "enemy",
     behaviour = "chase",
     blurb = "Fast, fragile, and never alone.",
-    tune = { hp = 5, speed = 58, damage = 4, radius = 3, lp = 1,
-             goldChance = 0.02, hpChance = 0.004, knockback = 1.8, weight = 8 },
+    -- Individually weaker than a grunt in every stat but speed, which is the
+    -- point: the threat is the pack, not the member.
+    tune = { hp = 5, speed = 96, damage = 4, radius = 3, lp = 1,
+             goldChance = 0.02, hpChance = 0.004, knockback = 1.8, weight = 8,
+             pack = 6 },
   },
   {
     id = "brute", name = "Brute", shape = "block", palette = "enemy",
