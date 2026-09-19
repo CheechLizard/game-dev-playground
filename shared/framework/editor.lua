@@ -133,7 +133,7 @@ local function drawSetting(entry, width)
     local x, y = ui.nextRow(14)
     if ui.button("reset." .. entry.key, "reset to " .. tostring(
         entry.type == "color" and "default" or entry.default),
-        { x = x, y = y, width = 120, height = 13 }) then
+        { x = x, y = y, width = ui.unit * 30, height = ui.unit * 4 }) then
       config.resetKey(entry.key)
     end
   end
@@ -246,7 +246,7 @@ local function drawProfilePage(width)
   ui.space(2)
 
   newProfileName = select(1, ui.textField("profile.newname", "New name", newProfileName,
-    { width = 170 }))
+    { width = ui.unit * 42 }))
   if ui.button("profile.saveas", "Save as new profile", { align = "center" }) then
     if profiles.sanitise(newProfileName) == "" then
       notify("Give the new profile a name first")
@@ -272,12 +272,12 @@ local function drawProfilePage(width)
       notify(profiles.status)
     end
     if ui.button("profile.startup." .. name, "launch",
-        { x = x + w - 90, y = y, width = 44, disabled = isStartup }) then
+        { x = x + w - ui.unit * 22, y = y, width = ui.unit * 11, disabled = isStartup }) then
       profiles.setStartup(name)
       notify(profiles.status)
     end
     if ui.button("profile.delete." .. name, "del",
-        { x = x + w - 44, y = y, width = 44, tone = "danger",
+        { x = x + w - ui.unit * 11, y = y, width = ui.unit * 11, tone = "danger",
           disabled = (name == "default") }) then
       profiles.delete(name)
       debugdraw.sync()
@@ -291,7 +291,7 @@ local function drawProfilePage(width)
     ui.label(string.format("%d key%s in this profile no longer exist in the schema:",
       #profiles.orphans, #profiles.orphans == 1 and "" or "s"), ui.theme.warn, 14)
     for i, key in ipairs(profiles.orphans) do
-      if i <= 12 then ui.label("  " .. key, ui.theme.dim, 13) end
+      if i <= 12 then ui.label("  " .. key, ui.theme.dim, ui.unit * 3) end
     end
     if ui.button("profile.prune", "Prune stale keys", { tone = "danger", align = "center" }) then
       profiles.pruneOrphans()
@@ -333,7 +333,7 @@ function editor.draw()
   local scale = config.values.ui and config.values.ui.fontScale or 1
   ui.rowHeight = math.max(20, font:getHeight() + 9)
   ui.pad = math.max(6, math.floor(font:getHeight() * 0.45))
-  editor.width = math.min(g.getWidth() - 40, editor.baseWidth * scale)
+  editor.width = math.min(g.getWidth() - ui.sectionGap * 2, editor.baseWidth * scale)
   editor.sidebarWidth = editor.baseSidebarWidth * scale
 
   local width = editor.width

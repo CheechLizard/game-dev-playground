@@ -39,9 +39,10 @@ tools/                 headless tests, the balance harness, the worktree helper
 | `F5` | zoo — one cage per enemy |
 | `F6` | range — one room per weapon |
 | `WASD` / left stick | move |
-| `P` / `start` | pause |
+| `P` / `start` | pause menu, which is also the level picker |
 | `R` | restart run |
 | `,` `.` | cycle: weapon in the zoo, enemy type on the range |
+| `↑` `↓` / d-pad | move through the pause menu; `space` picks |
 
 Firing is automatic. `F5` and `F6` toggle: press the same key again to go back
 to the run.

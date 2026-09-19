@@ -64,6 +64,7 @@ function love.load()
   -- 1. schema, 2. defaults, 3. profile, 4. game
   -- Font settings are framework-level, so they register alongside the game's.
   fonts.registerSettings()
+  ui.registerSettings()
   game.registerSettings()
   config.build()
   profiles.init()

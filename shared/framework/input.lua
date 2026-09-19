@@ -90,10 +90,14 @@ local KEY_ACTIONS = {
   r = "restart", p = "pause",
   -- Cycle through a list: weapons in the zoo, enemy types on the range.
   [","] = "prev", ["."] = "next",
+  -- Menu navigation. Arrows only: WASD stays movement, so a menu cannot
+  -- fight the player's hands over the same keys.
+  up = "menuUp", down = "menuDown",
 }
 local PAD_ACTIONS = {
   a = "confirm", b = "cancel", start = "pause", back = "restart",
   leftshoulder = "prev", rightshoulder = "next",
+  dpup = "menuUp", dpdown = "menuDown",
 }
 
 function input.keypressed(key)
