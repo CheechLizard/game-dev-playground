@@ -10,7 +10,6 @@
     "overlay.pickupRange": true,
     "overlay.playerAim": true,
     "perf.show": true,
-    "run.durationMinutes": 3,
-    "run.waveSeconds": 20
+    "run.durationMinutes": 3
   }
 }

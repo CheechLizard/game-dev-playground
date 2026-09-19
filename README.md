@@ -172,7 +172,7 @@ bubble size is a fact about the bot, not about the game.
 
 ## The horde survivor
 
-15-minute run, 60-second waves, shop every 3 waves. Enemies spawn off-screen in
+15-minute run, 15-second waves, shop every 2 waves. Enemies spawn off-screen in
 pulses and advance on the player; contact costs HP. Kills drop LP, which the
 player vacuums up to level, and levelling grants an automatic stat bump. Gold
 buys weapons and upgrades in the shop.
@@ -195,7 +195,8 @@ together after changing either.
 ### Known balance state
 
 Measured with the scripted pilot over several seeds and play styles: runs
-currently reach **wave 7-9 of 15**, with occasional full survivals. It is a
+currently reach **wave 44-54 of 68**, surviving the full run 17-50% of the
+time depending on play style. It is a
 playable starting point, not a balanced game — the numbers are all in the editor
 and want a human playing them.
 

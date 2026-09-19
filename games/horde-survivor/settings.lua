@@ -35,12 +35,13 @@ function M.register()
       default = 15, min = 1, max = 60, unit = "min", live = false,
       help = "Survive this long to win the run." },
     { key = "run.waveSeconds", label = "Wave length", type = "number",
-      default = 60, min = 5, max = 180, unit = "s",
+      default = 15, min = 5, max = 180, unit = "s",
       help = "A wave is a block of spawning. Run length / wave length = wave count." },
     { key = "run.startWave", label = "Starting wave", type = "int",
-      default = 3, min = 1, max = 30, live = false,
-      help = "The run opens on this wave. Waves 1-2 are a walkover, so the "
-        .. "run starts past them; enemy scaling and unlocks follow this number." },
+      default = 9, min = 1, max = 30, live = false,
+      help = "The run opens on this wave. The first eight waves are a walkover, "
+        .. "so the run starts past them; enemy scaling and unlocks follow this "
+        .. "number. At 15s waves that is the first two minutes." },
     { key = "run.wavesPerShop", label = "Waves per shop", type = "int",
       default = 2, min = 1, max = 10,
       help = "The shop opens after every Nth wave." },
@@ -164,9 +165,9 @@ function M.register()
     -- able to fund 25-35 purchases across a run. Gold income is sized against
     -- the enemy HP curve on the Waves page; move one and re-check the other.
     { key = "economy.goldPerWave", label = "Gold per wave cleared", type = "number",
-      default = 35, min = 0, max = 400 },
+      default = 6.5, min = 0, max = 400 },
     { key = "economy.goldWaveGrowth", label = "Wave gold growth", type = "number",
-      default = 12, min = 0, max = 100,
+      default = 0.75, min = 0, max = 100,
       help = "Added per wave index, so later waves pay more." },
   })
 
@@ -191,7 +192,7 @@ function M.register()
       default = 5, min = 0, max = 100,
       help = "Added to the reroll cost each time you reroll in one visit." },
     { key = "shop.priceWaveGrowth", label = "Price growth per wave", type = "number",
-      default = 0.06, min = 0, max = 1, format = "%.3f", unit = "x",
+      default = 0.015, min = 0, max = 1, format = "%.3f", unit = "x",
       help = "Prices rise with the wave number so late gold is not free power." },
     { key = "shop.healCost", label = "Heal cost", type = "number",
       default = 18, min = 0, max = 300 },
@@ -225,16 +226,16 @@ function M.register()
   -- by default: scaling on player level punishes picking up LP.
   register("Waves", "Scaling", 20, {
     { key = "scale.hpPerWave", label = "Enemy HP per wave", type = "number",
-      default = 0.07, min = 0, max = 2, format = "%.3f", unit = "x",
+      default = 0.017, min = 0, max = 2, format = "%.3f", unit = "x",
       help = "Compounding multiplier per wave index. Keep this BELOW the rate "
         .. "player damage grows, or clear speed falls every wave while spawn "
         .. "rate climbs, and the run becomes unwinnable rather than hard." },
     { key = "scale.damagePerWave", label = "Enemy damage per wave", type = "number",
-      default = 0.1, min = 0, max = 2, format = "%.3f", unit = "x" },
+      default = 0.024, min = 0, max = 2, format = "%.3f", unit = "x" },
     { key = "scale.speedPerWave", label = "Enemy speed per wave", type = "number",
-      default = 0.012, min = 0, max = 0.5, format = "%.3f", unit = "x" },
+      default = 0.003, min = 0, max = 0.5, format = "%.3f", unit = "x" },
     { key = "scale.lpPerWave", label = "LP value per wave", type = "number",
-      default = 0.06, min = 0, max = 2, format = "%.3f", unit = "x" },
+      default = 0.015, min = 0, max = 2, format = "%.3f", unit = "x" },
     { key = "scale.playerLevelWeight", label = "Player level weight", type = "number",
       default = 0, min = 0, max = 1, format = "%.3f",
       help = "Off by default. Above 0, enemies also scale with player level, "

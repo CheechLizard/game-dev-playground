@@ -234,11 +234,11 @@ for _, def in ipairs(content.passives) do content.passiveById[def.id] = def end
 
 content.waveTable = {
   { wave = 1,  unlock = { "grunt" } },
-  { wave = 2,  unlock = { "swarmer" } },
-  { wave = 4,  unlock = { "spitter" } },
-  { wave = 6,  unlock = { "brute" } },
-  { wave = 8,  unlock = { "lancer" } },
-  { wave = 11, unlock = { "orbiter" } },
+  { wave = 5,  unlock = { "swarmer" } },
+  { wave = 13, unlock = { "spitter" } },
+  { wave = 21, unlock = { "brute" } },
+  { wave = 29, unlock = { "lancer" } },
+  { wave = 41, unlock = { "orbiter" } },
 }
 
 content.enemyById = {}

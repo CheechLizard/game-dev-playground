@@ -2,10 +2,10 @@
   "description": "Steeper enemy scaling and denser spawns, with less gold to answer it.",
   "name": "brutal",
   "values": {
-    "economy.goldPerWave": 22,
-    "economy.goldWaveGrowth": 8,
+    "economy.goldPerWave": 4,
+    "economy.goldWaveGrowth": 0.5,
     "scale.eliteChance": 0.07,
-    "scale.hpPerWave": 0.11,
+    "scale.hpPerWave": 0.026,
     "wave.countEnd": 10,
     "wave.tickEnd": 0.7
   }

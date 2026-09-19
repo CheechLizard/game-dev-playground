@@ -35,7 +35,7 @@ retired, update it here too.
 |---|---|---|
 | **Run** | One playthrough attempt, from start to death or win. Holds the whole simulation and contains no draw calls or direct input reads, so it can run headless. | `games/horde-survivor/run.lua` |
 | **Run state** | Which phase a run is in: `playing`, `shop`, `dead`, `won`. | `run.STATE` |
-| **Wave** | The unit of escalation. Drives enemy composition and what content is unlocked. | `content.waveTable`, `content.unlockedAt` |
+| **Wave** | The unit of escalation, and a fixed block of time — **15 seconds** by default, not a batch of enemies you clear. Nothing but the clock advances it. Drives enemy composition, what content is unlocked, and the shop cadence. | `run.waveSeconds`, `content.waveTable`, `content.unlockedAt` |
 | **Enemy** / **Weapon** | Content definitions declared as data tables with typed field specs, looked up by id. | `content.enemies`, `content.weapons`, `content.enemyById`, `content.weaponById` |
 | **Behaviour** | An enemy's movement/attack pattern, declared as a field on the enemy definition. | `content.behaviourFields` |
 | **LP** | The levelling currency dropped by kills — this game's XP. Spent on nothing; it accrues toward the next level. Distinct from gold. | `run.player.lp`, `level.baseRequirement`, `scale.lpPerWave` |

@@ -79,7 +79,7 @@ deliberate, not defaults:
 | **Enemies scale on wave index, never player level** | Scaling to player level makes ignoring LP optimal, which fights the core loop. Available behind `scale.playerLevelWeight`, default `0` |
 | Profiles store diffs, not snapshots | New settings inherit defaults; old profiles never break |
 | Profiles live in the repo as JSON | Diffable, committable, shareable. Requires launching from the repo root |
-| 60s waves, ~2.5s spawn pulses | A wave is a block of spawning, not a single spawn. 15 waves, 5 shop visits per run |
+| 15s waves, ~2.5s spawn pulses | A wave is a block of spawning, not a single spawn. 60 waves, ~28 shop visits per run |
 
 ## The one invariant that matters
 
@@ -101,8 +101,8 @@ Two rules follow, and breaking either quietly undoes the property:
 
 ## Balance state
 
-Measured with a scripted pilot: runs reach **wave 7-9 of 15**, occasional full
-survivals. Playable, not balanced.
+Measured with a scripted pilot: runs reach **wave 44-54 of 68** and survive the
+full run 17-50% of the time. Playable, not balanced.
 
 Three structural problems were found and fixed via `tools/balance.lua`, worth
 knowing because they can be reintroduced:
@@ -112,7 +112,7 @@ knowing because they can be reintroduced:
 2. Gold income was ~90 per run against a shop that needs to fund 25-35
    purchases, since all progression choice lives there.
 3. **Enemy HP outgrew player damage**, so kill rate fell every wave while spawn
-   rate climbed 16×. By wave 15 the horde arrived 27× faster than it could be
+   rate climbed 16×. By the last wave the horde arrived 27× faster than it could be
    cleared. This is the failure mode to watch: keep `scale.hpPerWave` below the
    rate player damage grows, and re-check both the Waves and Economy pages after
    touching either.
