@@ -77,7 +77,7 @@ function run:reset()
   local c = C.values
   self.state = STATE.PLAYING
   self.time = 0
-  self.wave = math.max(1, c.run.startWave)
+  self.wave = 1
   self.waveTime = 0
   self.spawnTimer = 0
   self.shakeAmount = 0
@@ -157,12 +157,12 @@ function run:durationSeconds()
   return C.values.run.durationMinutes * 60
 end
 
+-- A run is its length divided by the wave length. The wave number is both the
+-- player's progress and its position on the difficulty curve; there is no
+-- offset between the two.
 function run:waveCount()
-  -- The run is still durationMinutes long; starting on a later wave shifts the
-  -- numbering up rather than cutting the run short, so the last wave is
-  -- startWave - 1 + however many waves fit in the duration.
-  local fit = math.floor(self:durationSeconds() / C.values.run.waveSeconds + 0.5)
-  return math.max(1, C.values.run.startWave - 1 + fit)
+  return math.max(1, math.floor(
+    self:durationSeconds() / C.values.run.waveSeconds + 0.5))
 end
 
 function run:log(kind, text)

@@ -37,11 +37,6 @@ function M.register()
     { key = "run.waveSeconds", label = "Wave length", type = "number",
       default = 15, min = 5, max = 180, unit = "s",
       help = "A wave is a block of spawning. Run length / wave length = wave count." },
-    { key = "run.startWave", label = "Starting wave", type = "int",
-      default = 9, min = 1, max = 30, live = false,
-      help = "The run opens on this wave. The first eight waves are a walkover, "
-        .. "so the run starts past them; enemy scaling and unlocks follow this "
-        .. "number. At 15s waves that is the first two minutes." },
     { key = "run.wavesPerShop", label = "Waves per shop", type = "int",
       default = 2, min = 1, max = 10,
       help = "The shop opens after every Nth wave." },

@@ -101,8 +101,9 @@ Two rules follow, and breaking either quietly undoes the property:
 
 ## Balance state
 
-Measured with a scripted pilot: runs reach **wave 44-54 of 68** and survive the
-full run 17-50% of the time. Playable, not balanced.
+Measured with a scripted pilot: runs reach **wave 54-60 of 60** and survive the
+full run 58-92% of the time. Too easy: the escalation curve was sized against a
+run with ~4 shop visits and now faces ~28.
 
 Three structural problems were found and fixed via `tools/balance.lua`, worth
 knowing because they can be reintroduced:

@@ -195,8 +195,9 @@ together after changing either.
 ### Known balance state
 
 Measured with the scripted pilot over several seeds and play styles: runs
-currently reach **wave 44-54 of 68**, surviving the full run 17-50% of the
-time depending on play style. It is a
+currently reach **wave 54-60 of 60**, surviving the full run 58-92% of the
+time depending on play style — the curve is too flat for a run with this many
+shop visits and wants raising. It is a
 playable starting point, not a balanced game — the numbers are all in the editor
 and want a human playing them.
 

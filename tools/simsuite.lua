@@ -160,23 +160,19 @@ function sim.run(suite, check, eq, near)
   do
     local r = runModule.new(1)
     eq("starts playing", r.state, runModule.STATE.PLAYING)
-    eq("starts on the configured starting wave", r.wave, config.get("run.startWave"))
+    eq("waves are numbered from one", r.wave, 1)
     eq("starts with one weapon", #r.player.weapons, 1)
     eq("starts at full HP", r.player.hp, config.get("player.maxHp"))
-    eq("wave count follows run length, wave length and start wave", r:waveCount(),
-      config.get("run.startWave") - 1
-        + math.floor(config.get("run.durationMinutes") * 60
-          / config.get("run.waveSeconds") + 0.5))
-
-    -- Starting later must not shorten the run, only shift the numbering.
-    config.set("run.startWave", 1)
-    local fromOne = runModule.new(1)
-    eq("starting at wave 1 gives the plain wave count", fromOne:waveCount(),
+    eq("wave count is run length over wave length", r:waveCount(),
       math.floor(config.get("run.durationMinutes") * 60
         / config.get("run.waveSeconds") + 0.5))
-    eq("run length is unchanged by the start wave",
-      fromOne:durationSeconds(), r:durationSeconds())
-    config.resetKey("run.startWave")
+
+    -- Wave 1 is the start of the run and the bottom of the curve.
+    eq("the run opens at the bottom of the curve",
+      runModule.waveScale(r.wave, 1).hp, 1)
+    eq("the last wave is the top of the curve", r:waveCount(),
+      math.floor(config.get("run.durationMinutes") * 60
+        / config.get("run.waveSeconds") + 0.5))
 
     -- Every enemy and weapon in content must have generated settings.
     local content = require("content")
@@ -335,14 +331,11 @@ function sim.run(suite, check, eq, near)
 
     config.set("enemy.grunt.hp", 999)
     config.set("scale.eliteChance", 0)   -- elites multiply HP; not what we test here
-    config.set("run.startWave", 1)       -- and so does wave scaling
     local r = runModule.new(2)
     local e = r:spawnEnemy("grunt", 10, 10)
     near("enemy HP comes from the editor value", e.hp, 999, 1e-6)
     config.resetKey("enemy.grunt.hp")
     config.resetKey("scale.eliteChance")
-    config.resetKey("run.startWave")
-
     config.set("weapon.blaster.damage", 50)
     near("weapon damage comes from the editor value",
       runModule.weaponValue("blaster", "damage", 1), 50)
@@ -355,8 +348,7 @@ function sim.run(suite, check, eq, near)
     config.set("run.waveSeconds", 30)
     local r2 = runModule.new(3)
     eq("wave count follows wave length", r2:waveCount(),
-      config.get("run.startWave") - 1
-        + math.floor(config.get("run.durationMinutes") * 60 / 30 + 0.5))
+      math.floor(config.get("run.durationMinutes") * 60 / 30 + 0.5))
     config.resetKey("run.waveSeconds")
   end
 end
