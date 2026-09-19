@@ -59,7 +59,10 @@ retired, update it here too.
 |---|---|---|
 | **Headless** | Running simulation or tests with no LÖVE window, under a Lua 5.1-compatible interpreter. Use `luajit`: Homebrew dropped `lua@5.1`, and LuaJIT is the VM LÖVE itself runs. | `tools/test.lua` |
 | **Sim suite** | Headless driver that plays runs to completion for balance checking. | `tools/simsuite.lua` |
-| **Balance harness** | Batch runner over the sim suite, reporting aggregate outcomes across many runs. | `tools/balance.lua --runs N` |
+| **Balance harness** | Batch runner over the sim suite, reporting aggregate outcomes across many runs and, by default, across a bubble sweep. | `tools/balance.lua --runs N` |
+| **Pilot** | The scripted player the sim suite drives. Kites rather than flees: it repels only from enemies inside its bubble, so it circles a group while its weapons work. Competent, not optimal. | `pilot` in `tools/simsuite.lua` |
+| **Bubble** | The pilot's personal-space radius in pixels. Survival time, weapon damage share and even which enemy is the top threat all move with it, so a single-bubble reading measures the pilot as much as the game. | `sim.defaultBubble`, `--bubble N` |
+| **Sweep** | Running the harness at several bubbles and reading the spread rather than one number. The default. A change that moves only one row has not moved the balance. | `SWEEP` in `tools/balance.lua` |
 
 ## Workflow
 

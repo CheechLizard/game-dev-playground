@@ -38,7 +38,11 @@ they only land in `config/profiles/` when the root is the cwd.
 is 5.1-compatible and is the VM LÖVE itself runs.
 
 Treat `tools/balance.lua` as a *relative* signal between two runs of the
-harness, not an absolute difficulty rating.
+harness, not an absolute difficulty rating. It sweeps the pilot's bubble by
+default and prints a row per bubble: read the spread, not one row. Survival
+time, which weapon leads on damage and which enemy is the top threat all move
+with the bubble, so a change that improves a single row has not actually
+changed the balance.
 
 ## Keys
 

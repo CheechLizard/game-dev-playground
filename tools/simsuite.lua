@@ -31,7 +31,8 @@ end
 -- a small bubble hugs the horde and dies to contact damage, a large one flees
 -- into corners and dies to ranged enemies. Neither extreme is how a human
 -- plays, so treat any single number here as one data point, not the truth.
--- Sweep it (tools/balance.lua --bubble N) before trusting a balance verdict.
+-- tools/balance.lua therefore sweeps it by default and reports a row per
+-- bubble; `--bubble N` pins one value when you want the per-run detail.
 sim.defaultBubble = 45
 
 local function pilot(r, bubble)
