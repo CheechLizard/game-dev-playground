@@ -335,6 +335,26 @@ local function pickWeighted(rng, ids)
   return ids[#ids]
 end
 
+--- Spawn one pack of `id` clustered around a point, behind the usual warning.
+-- Both the wave spawner and the sandbox levels go through here, so a pack
+-- arrives the same way wherever you meet it. That is the whole claim the zoo
+-- makes: what you see there is what a real run does. `limit` caps the group
+-- when there is less room left than a full pack. Returns how many were queued.
+function run:spawnPack(id, x, y, limit, onSpawn)
+  local c = C.values.wave
+  local pack = math.max(1, math.floor(C.get("enemy." .. id .. ".pack") or 1))
+  if limit then pack = math.min(pack, math.max(0, math.floor(limit))) end
+  for _ = 1, pack do
+    local jx = x + (self.rng.next() - 0.5) * c.packSpread
+    local jy = y + (self.rng.next() - 0.5) * c.packSpread
+    self:queueSpawn(id,
+      math.max(4, math.min(self.arenaW - 4, jx)),
+      math.max(4, math.min(self.arenaH - 4, jy)),
+      onSpawn)
+  end
+  return pack
+end
+
 function run:updateSpawning(dt)
   local waveCount = self:waveCount()
   -- Interpolate spawn pressure from wave 1 to the last wave.
@@ -366,15 +386,9 @@ function run:updateSpawning(dt)
   while spawned < budget do
     if atCap() then break end
     local id = pickWeighted(self.rng, ids)
-    local pack = math.max(1, math.floor(C.get("enemy." .. id .. ".pack") or 1))
     local x, y = self:offscreenPoint()
-    for _ = 1, pack do
-      if atCap() then break end
-      local jx = x + (self.rng.next() - 0.5) * c.packSpread
-      local jy = y + (self.rng.next() - 0.5) * c.packSpread
-      self:queueSpawn(id, jx, jy)
-      spawned = spawned + 1
-    end
+    local room = c.maxAlive - (#self.enemies + #self.pendingSpawns)
+    spawned = spawned + self:spawnPack(id, x, y, room)
   end
 end
 

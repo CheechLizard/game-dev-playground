@@ -194,11 +194,15 @@ function sandbox.update(s, dt, moveX, moveY)
       or content.enemies[s.selection].id
     s.spawnTimer = (s.spawnTimer or 0) - dt
     local incoming = #r.enemies + #r.pendingSpawns
-    if s.spawnTimer <= 0 and incoming < targetPopulation(s) then
+    local target = targetPopulation(s)
+    if s.spawnTimer <= 0 and incoming < target then
       s.spawnTimer = math.max(0.05, c.sandbox.spawnInterval)
       local cage = s.active
       local x, y = randomPointIn(cage, r.rng)
-      r:queueSpawn(spawnId, x, y, function(e) e.cage = cage end)
+      -- Through the run's own pack spawner, not a second copy: a pack enemy
+      -- that arrived alone in its cage would make the zoo lie about it.
+      r:spawnPack(spawnId, x, y, target - incoming,
+        function(e) e.cage = cage end)
     end
   end
 
