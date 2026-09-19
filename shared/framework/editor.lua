@@ -98,7 +98,10 @@ local function isModified(entry)
 end
 
 --- Draw one setting. Returns true when the value changed this frame.
-local function drawSetting(entry, width)
+-- Shared with the sandbox placards, so a stat is edited the same way
+-- wherever you meet it and there is only one mapping from type to widget.
+local function drawSetting(entry, width, opts)
+  opts = opts or {}
   local value = config.get(entry.key)
   local changed, newValue = false, value
   local label = entry.label or entry.key
@@ -138,12 +141,16 @@ local function drawSetting(entry, width)
     end
   end
 
-  if entry.help and editor.showHelp then
-    ui.label(entry.help, ui.theme.dim, 14)
+  local showHelp = opts.showHelp
+  if showHelp == nil then showHelp = editor.showHelp end
+  if entry.help and showHelp then
+    ui.label(entry.help, ui.theme.dim, ui.lineHeight)
   end
   ui.space(3)
   return changed
 end
+
+editor.drawSetting = drawSetting
 
 local function drawActions(page, sectionName, width)
   local sections = editor.actions[page]

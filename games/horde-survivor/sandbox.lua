@@ -17,6 +17,9 @@ local content = require("content")
 local fonts = require("framework.fonts")
 local render = require("render")
 local runModule = require("run")
+local schema = require("framework.schema")
+local editor = require("framework.editor")
+local ui = require("framework.ui")
 
 local sandbox = {}
 
@@ -263,30 +266,6 @@ end
 
 -- ------------------------------------------------------------------ overlay
 
---- One "label  value" row. Returns the y for the next row.
-local function statRow(x, y, w, label, value, font)
-  local g = love.graphics
-  g.setColor(1, 1, 1, 0.45)
-  g.print(label, x, y)
-  g.setColor(1, 1, 1, 0.95)
-  g.printf(value, x, y, w, "right")
-  return y + font:getHeight() + 3
-end
-
-local function formatValue(field, value)
-  if value == nil then return "-" end
-  local text
-  if field.format then
-    text = string.format(field.format, value)
-  elseif field.type == "int" or value == math.floor(value) then
-    text = string.format("%d", value)
-  else
-    text = string.format("%.2f", value)
-  end
-  if field.unit then text = text .. " " .. field.unit end
-  return text
-end
-
 local function enemyFields(def)
   local fields = {}
   for _, f in ipairs(content.enemyFields) do fields[#fields + 1] = f end
@@ -336,8 +315,7 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   -- Panel sized to the rows it actually holds. The blurb wraps, so its height
   -- has to be measured rather than assumed to be one line -- guessing put it
   -- on top of the first stat row and ran the rows out of the panel.
-  local rowH = small:getHeight() + 3
-  local panelW = math.min(viewW * 0.34, 340)
+  local panelW = math.min(viewW * 0.40, 380)
   local innerW = panelW - pad * 2
 
   local metaText = (s.mode == "zoo")
@@ -346,20 +324,25 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   local _, metaLines = small:getWrap(metaText, innerW)
   local _, blurbLines = small:getWrap(def.blurb or "", innerW)
 
-  local shown = 0
+  local entries = {}
   for _, field in ipairs(fields) do
-    if config.get(prefix .. field.name) ~= nil then shown = shown + 1 end
+    local entry = schema.get(prefix .. field.name)
+    if entry and config.get(entry.key) ~= nil then entries[#entries + 1] = entry end
   end
 
   local headerH = title:getHeight() + 3
     + (#metaLines + #blurbLines) * small:getHeight() + 8
-  local panelH = pad * 0.6 + headerH + shown * rowH + pad * 0.6
+  -- Editable rows are far taller than the readouts they replace, so the panel
+  -- takes what it needs up to the view and the rest scrolls.
+  local rowH = ui.unit * 9
+  local wantH = pad * 0.6 + headerH + #entries * rowH + pad * 0.6
+  local panelH = math.min(wantH, viewH - pad * 2)
   local px = ox + pad
   local py = oy + viewH - pad - panelH
 
-  g.setColor(0.06, 0.06, 0.09, 0.9)
+  g.setColor(ui.theme.background)
   g.rectangle("fill", px, py, panelW, panelH)
-  g.setColor(1, 1, 1, 0.16)
+  g.setColor(ui.theme.line)
   g.rectangle("line", px + 0.5, py + 0.5, panelW - 1, panelH - 1)
 
   local x = px + pad
@@ -379,12 +362,19 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   g.printf(def.blurb or "", x, y, w, "left")
   y = y + #blurbLines * small:getHeight() + 8
 
-  for _, field in ipairs(fields) do
-    local value = config.get(prefix .. field.name)
-    if value ~= nil then
-      y = statRow(x, y, w, field.label, formatValue(field, value), small)
-    end
+  -- The stats are the real settings, drawn with the editor's own widgets, so
+  -- a room can be tuned from the corridor and tested by stepping into it.
+  local listY = y
+  local listH = py + panelH - listY - pad * 0.6
+  local innerWidth = ui.beginScroll("sandbox.placard", px, listY, panelW, listH)
+  g.setFont(small)
+  for _, entry in ipairs(entries) do
+    editor.drawSetting(entry, innerWidth, { showHelp = false })
   end
+  ui.endScroll("sandbox.placard", px, listY, panelW, listH)
+
+  -- An open dropdown draws last or it is clipped by the panel it came from.
+  ui.drawDeferred()
   g.setColor(1, 1, 1, 1)
 end
 
