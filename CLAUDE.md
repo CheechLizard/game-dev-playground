@@ -58,6 +58,27 @@ changed the balance.
 - **Keep the glossary in sync in the same change.** Adding, renaming or
   retiring a term means editing `docs/glossary.md` in that same commit.
 
+## Where work lands
+
+**`~/Dev/game-dev-playground` on local `main` is the only checkout the user
+runs.** Merge finished work into local `main` so it can be tested there. Do not
+ask the user to run a worktree build; they will not, unless there is a specific
+reason to look at a branch in isolation, and you should say what that reason is
+when you ask.
+
+**Always merge to local `main` before pushing to `origin/main`.** Never push a
+branch as the way of delivering work, and never leave the user's clone on a
+branch other than `main`.
+
+After merging, verify the combination before handing it over: `luajit
+tools/test.lua`, plus the balance harness if the merge touched the simulation
+and a screen capture if it touched the UI. Two branches that each passed alone
+can still be broken together.
+
+Worktrees are still the right place to *do* the work — they keep parallel
+branches from fighting over one checkout. They are a workspace, not a delivery
+mechanism.
+
 ## Parallel work
 
 Worktrees live as *siblings* of the repo, never inside it — `love .` treats the
