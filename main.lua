@@ -20,6 +20,7 @@ local editor = require("framework.editor")
 local perf = require("framework.perf")
 local input = require("framework.input")
 local ui = require("framework.ui")
+local fonts = require("framework.fonts")
 
 local DEFAULT_GAME = "horde-survivor"
 
@@ -61,6 +62,8 @@ function love.load()
   game = require("game")
 
   -- 1. schema, 2. defaults, 3. profile, 4. game
+  -- Font settings are framework-level, so they register alongside the game's.
+  fonts.registerSettings()
   game.registerSettings()
   config.build()
   profiles.init()
@@ -71,6 +74,7 @@ function love.load()
   config.listen("render.height", rebuildCanvas)
 
   input.init()
+  love.graphics.setFont(fonts.role("body"))
   game.load()
 end
 
@@ -106,7 +110,7 @@ function love.draw()
   -- text stays readable at any window size.
   game.drawScreenOverlay(scale, offsetX, offsetY)
   if config.values.perf.show then
-    perf.draw(love.graphics.getWidth() - 198, 8, ui.theme)
+    perf.draw(love.graphics.getWidth() - perf.panelWidth() - 8, 8, ui.theme)
   end
   editor.draw()
   ui.endFrame()
@@ -117,6 +121,8 @@ function love.keypressed(key, scancode, isrepeat)
   if key == "f2" then config.set("perf.show", not config.get("perf.show")) return end
   if key == "f3" then debugdraw.toggle("colliders") return end
   if key == "f4" then debugdraw.master = not debugdraw.master return end
+  if key == "f5" and game.setMode then game.setMode("zoo") return end
+  if key == "f6" and game.setMode then game.setMode("range") return end
 
   ui.keypressed(key)
   if ui.capturingKeyboard() then return end

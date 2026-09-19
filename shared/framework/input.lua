@@ -88,9 +88,12 @@ end
 local KEY_ACTIONS = {
   escape = "cancel", space = "confirm", ["return"] = "confirm",
   r = "restart", p = "pause",
+  -- Cycle through a list: weapons in the zoo, enemy types on the range.
+  [","] = "prev", ["."] = "next",
 }
 local PAD_ACTIONS = {
   a = "confirm", b = "cancel", start = "pause", back = "restart",
+  leftshoulder = "prev", rightshoulder = "next",
 }
 
 function input.keypressed(key)

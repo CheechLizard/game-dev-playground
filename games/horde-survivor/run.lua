@@ -77,7 +77,7 @@ function run:reset()
   local c = C.values
   self.state = STATE.PLAYING
   self.time = 0
-  self.wave = 1
+  self.wave = math.max(1, c.run.startWave)
   self.waveTime = 0
   self.spawnTimer = 0
   self.shakeAmount = 0
@@ -103,7 +103,9 @@ function run:reset()
     -- Level-up bonuses accumulate here rather than mutating config, so the
     -- editor keeps showing the base values you typed.
     bonus = { maxHp = 0, damage = 0, attackSpeed = 0, moveSpeed = 0,
-              pickupRange = 0, area = 0 },
+              pickupRange = 0, area = 0, crit = 0, goldFind = 0 },
+    -- passive id -> how many times it has been bought, for pricing and caps
+    passives = {},
     weapons = {},
   }
 
@@ -124,12 +126,43 @@ function run:reset()
   self:addWeapon(c.player.startingWeapon)
 end
 
+--- Stacks a passive onto the player. Raising max HP heals by the same amount,
+-- so buying Plating mid-fight is not a downgrade in effective health.
+function run:addPassive(id)
+  local def = content.passiveById[id]
+  if not def then return false, "no such passive" end
+  local owned = self.player.passives[id] or 0
+  if owned >= C.get("passive." .. id .. ".maxStacks") then
+    return false, "maxed out"
+  end
+  local amount = C.get("passive." .. id .. ".amount")
+  self.player.bonus[def.stat] = (self.player.bonus[def.stat] or 0) + amount
+  if def.stat == "maxHp" then
+    self.player.maxHp = self:playerStat("maxHp")
+    self.player.hp = self.player.hp + amount
+  end
+  self.player.passives[id] = owned + 1
+  return true
+end
+
+--- What the next stack of a passive costs, given how many are already owned.
+function run:passiveCost(id, priceMult)
+  local owned = self.player.passives[id] or 0
+  local base = C.get("passive." .. id .. ".cost")
+  local growth = C.get("passive." .. id .. ".costGrowth")
+  return math.ceil(base * (1 + growth * owned) * (priceMult or 1))
+end
+
 function run:durationSeconds()
   return C.values.run.durationMinutes * 60
 end
 
 function run:waveCount()
-  return math.max(1, math.floor(self:durationSeconds() / C.values.run.waveSeconds + 0.5))
+  -- The run is still durationMinutes long; starting on a later wave shifts the
+  -- numbering up rather than cutting the run short, so the last wave is
+  -- startWave - 1 + however many waves fit in the duration.
+  local fit = math.floor(self:durationSeconds() / C.values.run.waveSeconds + 0.5)
+  return math.max(1, C.values.run.startWave - 1 + fit)
 end
 
 function run:log(kind, text)
@@ -189,6 +222,8 @@ function run:playerStat(name)
   if name == "attackSpeedMult" then return c.attackSpeedMult + p.bonus.attackSpeed end
   if name == "areaMult" then return c.areaMult + p.bonus.area end
   if name == "pickupRange" then return c.pickupRange + p.bonus.pickupRange end
+  if name == "critChance" then return c.critChance + p.bonus.crit end
+  if name == "goldFind" then return c.goldFind + p.bonus.goldFind end
   return c[name]
 end
 
@@ -207,7 +242,8 @@ function run:spawnEnemy(id, x, y)
     x = x, y = y, vx = 0, vy = 0,
     hp = hp, maxHp = hp,
     radius = C.get(key .. "radius") * (elite and 1.7 or 1),
-    speed = C.get(key .. "speed") * scale.speed,
+    speed = C.get(key .. "speed") * scale.speed
+      * (elite and C.values.scale.eliteSpeedMult or 1),
     damage = C.get(key .. "damage") * scale.damage,
     lp = C.get(key .. "lp") * scale.lp * (elite and C.values.scale.eliteRewardMult or 1),
     knockback = C.get(key .. "knockback"),
@@ -338,6 +374,18 @@ function run:rollShop()
     end
   end
 
+  for _, def in ipairs(content.passives) do
+    local owned = self.player.passives[def.id] or 0
+    if owned < C.get("passive." .. def.id .. ".maxStacks") then
+      candidates[#candidates + 1] = {
+        kind = "passive", passiveId = def.id,
+        name = owned > 0 and (def.name .. " x" .. (owned + 1)) or def.name,
+        blurb = def.blurb,
+        cost = self:passiveCost(def.id, priceMult),
+      }
+    end
+  end
+
   candidates[#candidates + 1] = {
     kind = "heal",
     name = "Field Repair (+" .. math.floor(c.shop.healAmount) .. " HP)",
@@ -383,6 +431,9 @@ function run:shopBuy(index)
   elseif item.kind == "heal" then
     self.player.hp = math.min(self:playerStat("maxHp"),
       self.player.hp + C.values.shop.healAmount)
+  elseif item.kind == "passive" then
+    local ok, err = self:addPassive(item.passiveId)
+    if not ok then return false, err end
   end
 
   self.player.gold = self.player.gold - item.cost
@@ -411,7 +462,7 @@ end
 -- ------------------------------------------------------------------ level
 
 function run:addGold(amount)
-  amount = amount * C.values.player.goldFind
+  amount = amount * self:playerStat("goldFind")
   self.player.gold = self.player.gold + amount
   self.stats.goldEarned = self.stats.goldEarned + amount
 end
@@ -455,7 +506,7 @@ function run:damageEnemy(enemy, amount, weaponId, kx, ky)
   local crit = false
   if weaponId then
     local chance = (run.weaponValue(weaponId, "critChance", self:weaponLevel(weaponId)) or 0)
-      + C.values.player.critChance
+      + self:playerStat("critChance")
     if self.rng.next() < chance then
       crit = true
       amount = amount * C.values.player.critMult
@@ -984,13 +1035,19 @@ function run:update(dt, moveX, moveY)
   self.shakeAmount = math.max(0, self.shakeAmount - dt * 12)
 
   self:updatePlayer(dt, moveX or 0, moveY or 0)
-  self:updateSpawning(dt)
+  -- Sandbox runs (the zoo and the range) drive their own spawning and have no
+  -- wave clock, so the run is a plain simulation of player, enemies and
+  -- weapons. Everything else behaves exactly as it does in a real run, which
+  -- is the point: what you test there is what you get.
+  if not self.sandbox then self:updateSpawning(dt) end
   self:updateEnemies(dt)
   self:separateEnemies(dt)
   self:updateWeapons(dt)
   self:updateProjectiles(dt)
   self:updateEnemyShots(dt)
   self:updatePickups(dt)
+
+  if self.sandbox then return end
 
   if self.waveTime >= C.values.run.waveSeconds then
     self:advanceWave()

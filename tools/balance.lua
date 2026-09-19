@@ -1,11 +1,11 @@
 -- Headless balance report.
 --
---   lua5.1 tools/balance.lua                      full run, default profile
---   lua5.1 tools/balance.lua --runs 8             average over 8 seeds
---   lua5.1 tools/balance.lua --profile glass      load a config profile first
---   lua5.1 tools/balance.lua --seconds 300        stop early
---   lua5.1 tools/balance.lua --csv waves.csv      per-run rows for a spreadsheet
---   lua5.1 tools/balance.lua --bubble 60          how close the pilot plays
+--   luajit tools/balance.lua                      full run, default profile
+--   luajit tools/balance.lua --runs 8             average over 8 seeds
+--   luajit tools/balance.lua --profile glass      load a config profile first
+--   luajit tools/balance.lua --seconds 300        stop early
+--   luajit tools/balance.lua --csv waves.csv      per-run rows for a spreadsheet
+--   luajit tools/balance.lua --bubble 60          how close the pilot plays
 --
 -- The pilot is competent but not optimal, so treat the numbers as a relative
 -- signal between two profiles rather than as an absolute difficulty rating.

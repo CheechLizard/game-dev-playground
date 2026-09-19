@@ -14,10 +14,53 @@ local content = require("content")
 local runModule = require("run")
 local render = require("render")
 local hud = require("hud")
+local sandbox = require("sandbox")
 
 local game = {}
 
 local current = nil
+local paused = false
+
+-- "run" is the game. "zoo" and "range" are the inspection levels; both hold a
+-- sandbox whose own run is simulated in place of the real one.
+local mode = "run"
+local sandboxState = nil
+
+--- Enter a level outright. `next` is "run", "zoo" or "range".
+local function enterMode(next)
+  mode = next
+  render.underlay = nil
+  if next == "run" then
+    sandboxState = nil
+    if current then render.snapCamera(current) end
+  else
+    sandboxState = sandbox.new(next)
+    render.snapCamera(sandboxState.run)
+  end
+end
+
+--- Switch level. Asking for the level you are already in returns to the run,
+-- so F5 and F6 toggle rather than needing a second key to leave.
+function game.setMode(next)
+  if next ~= "run" and mode == next then next = "run" end
+  enterMode(next)
+end
+
+function game.mode() return mode end
+
+
+--- True when the simulation is frozen, either by the pause key or because the
+-- editor is open and configured to pause. The shop and the end-of-run summary
+-- are their own states and are not affected.
+function game.isPaused()
+  if paused then return true end
+  return editor.open and config.values.run.pauseWithEditor
+end
+
+function game.togglePause()
+  paused = not paused
+  return paused
+end
 
 -- ------------------------------------------------------------- registration
 
@@ -100,6 +143,16 @@ local function registerDebugActions()
       end }
   end
 
+  editor.action{ page = "Levels", section = "Go to", order = 1,
+    label = "Play the run", tone = "accent",
+    fn = function() game.setMode("run") end }
+  editor.action{ page = "Levels", section = "Go to", order = 2,
+    label = "Zoo (F5)",
+    fn = function() game.setMode("zoo") end }
+  editor.action{ page = "Levels", section = "Go to", order = 3,
+    label = "Range (F6)",
+    fn = function() game.setMode("range") end }
+
   editor.action{ page = "Overlays", section = "All", order = 1,
     label = "Turn every overlay on",
     fn = function() debugdraw.setAll(true) end }
@@ -154,6 +207,21 @@ function game.update(dt)
   if not current then return end
   local c = config.values
 
+  if input.consume("pause") then paused = not paused end
+
+  if sandboxState then
+    if input.consume("prev") then sandbox.cycle(sandboxState, -1) end
+    if input.consume("next") then sandbox.cycle(sandboxState, 1) end
+    if input.consume("restart") then enterMode(mode) end
+    if not game.isPaused() then
+      local mx, my = input.move()
+      sandbox.update(sandboxState, dt * c.debug.timeScale, mx, my)
+      render.updateCamera(sandboxState.run, dt)
+    end
+    perf.count("enemies", #sandboxState.run.enemies)
+    return
+  end
+
   if current.state == runModule.STATE.SHOP then
     handleShopInput(current)
     current:update(dt * c.debug.timeScale, 0, 0)
@@ -170,6 +238,9 @@ function game.update(dt)
     current:update(dt, 0, 0)
     return
   end
+
+  -- Frozen: no simulation, no camera drift, but the HUD still draws.
+  if game.isPaused() then return end
 
   local mx, my = input.move()
 
@@ -209,13 +280,28 @@ end
 -- -------------------------------------------------------------------- draw
 
 function game.draw()
+  if sandboxState then
+    render.underlay = function() sandbox.draw(sandboxState) end
+    render.draw(sandboxState.run)
+    render.underlay = nil
+    return
+  end
   if not current then return end
   render.draw(current)
 end
 
 function game.drawScreenOverlay(scale, ox, oy)
+  if sandboxState then
+    sandbox.drawOverlay(sandboxState, scale, ox, oy)
+    if game.isPaused() then hud.drawPaused(scale, ox, oy) end
+    return
+  end
   if not current then return end
   hud.draw(current, scale, ox, oy)
+
+  if game.isPaused() and current.state == runModule.STATE.PLAYING then
+    hud.drawPaused(scale, ox, oy)
+  end
 
   if config.values.debug.showRunState then
     local g = love.graphics
@@ -230,7 +316,34 @@ end
 
 -- ------------------------------------------------------------------- input
 
+--- Move the shop cursor across the grid the shop is actually drawn as.
+-- Clamps at the edges rather than wrapping: wrapping past the last item into
+-- the first is disorienting when the grid's bottom row is short.
+local function moveShopCursor(r, dx, dy)
+  local shop = r.shop
+  if not shop then return end
+  local count = #shop.items
+  if count == 0 then return end
+  local cols = hud.shopColumns(count)
+  local index = shop.cursor - 1
+  local col, row = index % cols, math.floor(index / cols)
+
+  if dx ~= 0 then
+    col = math.max(0, math.min(cols - 1, col + dx))
+  end
+  if dy ~= 0 then
+    local rows = math.ceil(count / cols)
+    row = math.max(0, math.min(rows - 1, row + dy))
+  end
+
+  -- The last row can be short; fall back to its final cell.
+  local target = row * cols + col
+  if target >= count then target = count - 1 end
+  shop.cursor = target + 1
+end
+
 function game.keypressed(key)
+  if sandboxState then return end
   if not current then return end
 
   if current.state == runModule.STATE.SHOP then
@@ -243,9 +356,13 @@ function game.keypressed(key)
     elseif key == "return" or key == "kpenter" or key == "escape" then
       current:closeShop()
     elseif key == "up" or key == "w" then
-      current.shop.cursor = math.max(1, current.shop.cursor - 1)
+      moveShopCursor(current, 0, -1)
     elseif key == "down" or key == "s" then
-      current.shop.cursor = math.min(#current.shop.items, current.shop.cursor + 1)
+      moveShopCursor(current, 0, 1)
+    elseif key == "left" or key == "a" then
+      moveShopCursor(current, -1, 0)
+    elseif key == "right" or key == "d" then
+      moveShopCursor(current, 1, 0)
     elseif key == "space" then
       current:shopBuy(current.shop.cursor)
     end
@@ -262,9 +379,13 @@ function game.gamepadpressed(_, button)
   end
   local shop = current.shop
   if button == "dpup" then
-    shop.cursor = math.max(1, shop.cursor - 1)
+    moveShopCursor(current, 0, -1)
   elseif button == "dpdown" then
-    shop.cursor = math.min(#shop.items, shop.cursor + 1)
+    moveShopCursor(current, 0, 1)
+  elseif button == "dpleft" then
+    moveShopCursor(current, -1, 0)
+  elseif button == "dpright" then
+    moveShopCursor(current, 1, 0)
   elseif button == "a" then
     current:shopBuy(shop.cursor)
   elseif button == "x" then

@@ -11,6 +11,9 @@ local render = {}
 
 render.camera = { x = 0, y = 0, shakeX = 0, shakeY = 0 }
 
+-- Set by the game to draw beneath the entities; nil in an ordinary run.
+render.underlay = nil
+
 local function palette(name)
   return config.values.palette[name]
 end
@@ -65,7 +68,9 @@ end
 
 -- ----------------------------------------------------------------- sprites
 
-local function drawShape(shape, x, y, radius)
+--- Draw an enemy sprite. Exposed because the zoo draws the same shapes the
+-- arena does; there must be one definition of what a Brute looks like.
+function render.drawShape(shape, x, y, radius)
   local g = love.graphics
   if shape == "dot" then
     g.rectangle("fill", x - radius, y - radius, radius * 2, radius * 2)
@@ -85,6 +90,175 @@ local function drawShape(shape, x, y, radius)
   end
 end
 
+-- ------------------------------------------------------------ weapon icons
+-- Placeholder art, drawn from primitives to match the art direction: no image
+-- files anywhere in the project. Each icon reads as its firing pattern, so the
+-- shop grid is scannable without reading the names.
+
+local ICONS = {}
+
+function ICONS.blaster(g, s)
+  -- A barrel with a single shot leaving it.
+  g.rectangle("fill", -s * 0.7, -s * 0.16, s * 0.9, s * 0.32)
+  g.rectangle("fill", s * 0.45, -s * 0.1, s * 0.2, s * 0.2)
+  g.circle("fill", s * 0.82, 0, s * 0.13)
+end
+
+function ICONS.scatter(g, s)
+  -- A cone of pellets.
+  g.rectangle("fill", -s * 0.75, -s * 0.18, s * 0.6, s * 0.36)
+  for i = -1, 1 do
+    local a = i * 0.42
+    for step = 1, 3 do
+      local d = s * (0.25 + step * 0.22)
+      g.circle("fill", math.cos(a) * d, math.sin(a) * d, s * 0.09)
+    end
+  end
+end
+
+function ICONS.lance(g, s)
+  -- One long piercing bar with a head, skewering two marks.
+  g.rectangle("fill", -s * 0.85, -s * 0.09, s * 1.4, s * 0.18)
+  g.polygon("fill", s * 0.55, -s * 0.28, s * 0.95, 0, s * 0.55, s * 0.28)
+  g.setColor(1, 1, 1, 0.35)
+  g.circle("line", -s * 0.2, 0, s * 0.26)
+  g.circle("line", s * 0.25, 0, s * 0.26)
+end
+
+function ICONS.orbiter(g, s)
+  -- Blades on an orbit ring.
+  g.setColor(1, 1, 1, 0.35)
+  g.circle("line", 0, 0, s * 0.62)
+  g.setColor(1, 1, 1, 1)
+  g.circle("fill", 0, 0, s * 0.16)
+  for i = 0, 2 do
+    local a = i * (math.pi * 2 / 3)
+    g.circle("fill", math.cos(a) * s * 0.62, math.sin(a) * s * 0.62, s * 0.17)
+  end
+end
+
+function ICONS.aura(g, s)
+  -- Concentric pulses around the wielder.
+  g.circle("fill", 0, 0, s * 0.17)
+  for i = 1, 3 do
+    g.setColor(1, 1, 1, 0.45 - i * 0.1)
+    g.circle("line", 0, 0, s * (0.24 + i * 0.2))
+  end
+end
+
+-- Passive icons. Same rules as the weapon icons: primitives only, and each
+-- one has to be tellable from the others at shop-cell size, which a shared
+-- generic mark is not.
+
+local PASSIVE_ICONS = {}
+
+function PASSIVE_ICONS.power(g, s)        -- a cell with its terminal
+  g.rectangle("fill", -s * 0.34, -s * 0.62, s * 0.68, s * 1.24)
+  g.rectangle("fill", -s * 0.14, -s * 0.8, s * 0.28, s * 0.2)
+  g.setColor(0, 0, 0, 0.5)
+  g.rectangle("fill", -s * 0.18, -s * 0.34, s * 0.36, s * 0.5)
+end
+
+function PASSIVE_ICONS.coolant(g, s)      -- a snowflake
+  for i = 0, 2 do
+    local a = i * (math.pi / 3)
+    local dx, dy = math.cos(a) * s * 0.72, math.sin(a) * s * 0.72
+    g.setLineWidth(math.max(1, s * 0.13))
+    g.line(-dx, -dy, dx, dy)
+  end
+  g.setLineWidth(1)
+end
+
+function PASSIVE_ICONS.boots(g, s)        -- speed chevrons
+  for i = 0, 1 do
+    local y = -s * 0.35 + i * s * 0.55
+    g.polygon("fill", -s * 0.6, y + s * 0.26, 0, y - s * 0.26, s * 0.6, y + s * 0.26,
+      s * 0.6, y + s * 0.02, 0, y - s * 0.5, -s * 0.6, y + s * 0.02)
+  end
+end
+
+function PASSIVE_ICONS.plating(g, s)      -- a shield
+  g.polygon("fill", 0, -s * 0.75, s * 0.62, -s * 0.42, s * 0.62, s * 0.2,
+    0, s * 0.78, -s * 0.62, s * 0.2, -s * 0.62, -s * 0.42)
+  g.setColor(0, 0, 0, 0.45)
+  g.polygon("fill", 0, -s * 0.46, s * 0.36, -s * 0.26, s * 0.36, s * 0.14,
+    0, s * 0.46, -s * 0.36, s * 0.14, -s * 0.36, -s * 0.26)
+end
+
+function PASSIVE_ICONS.resonator(g, s)    -- widening pulses
+  g.circle("fill", -s * 0.55, 0, s * 0.16)
+  for i = 1, 3 do
+    g.setColor(1, 1, 1, 0.8 - i * 0.18)
+    g.arc("line", "open", -s * 0.55, 0, s * (0.24 + i * 0.26), -0.9, 0.9)
+  end
+end
+
+function PASSIVE_ICONS.magnet(g, s)       -- a horseshoe
+  g.setLineWidth(math.max(2, s * 0.26))
+  g.arc("line", "open", 0, s * 0.08, s * 0.52, math.pi, math.pi * 2)
+  g.setLineWidth(1)
+  g.rectangle("fill", -s * 0.65, s * 0.04, s * 0.26, s * 0.5)
+  g.rectangle("fill", s * 0.39, s * 0.04, s * 0.26, s * 0.5)
+end
+
+function PASSIVE_ICONS.scope(g, s)        -- a crosshair
+  g.circle("line", 0, 0, s * 0.52)
+  g.circle("fill", 0, 0, s * 0.11)
+  for i = 0, 3 do
+    local a = i * (math.pi / 2)
+    g.line(math.cos(a) * s * 0.38, math.sin(a) * s * 0.38,
+           math.cos(a) * s * 0.85, math.sin(a) * s * 0.85)
+  end
+end
+
+function PASSIVE_ICONS.ledger(g, s)       -- a stack of coins
+  for i = 0, 2 do
+    local y = s * 0.42 - i * s * 0.36
+    g.ellipse("fill", 0, y, s * 0.6, s * 0.2)
+    g.setColor(0, 0, 0, 0.35)
+    g.ellipse("line", 0, y, s * 0.6, s * 0.2)
+    g.setColor(1, 1, 1, 1)
+  end
+end
+
+--- Draw a passive's placeholder icon. Falls back to a ringed dot so a newly
+-- added passive is visible before it has art of its own.
+function render.drawPassiveIcon(id, x, y, size, colour)
+  local g = love.graphics
+  local col = colour or palette("accent")
+  g.push()
+  g.translate(x, y)
+  g.setColor(col[1], col[2], col[3], col[4] or 1)
+  local icon = PASSIVE_ICONS[id]
+  if icon then
+    icon(g, size * 0.5)
+  else
+    g.circle("line", 0, 0, size * 0.34)
+    g.circle("fill", 0, 0, size * 0.13)
+  end
+  g.pop()
+  g.setColor(1, 1, 1, 1)
+end
+
+--- Draw a weapon's placeholder icon centred on (x, y), sized to `size` px.
+-- Falls back to a generic mark so a new weapon is never invisible.
+function render.drawWeaponIcon(id, x, y, size, colour)
+  local g = love.graphics
+  local col = colour or palette("player")
+  g.push()
+  g.translate(x, y)
+  g.setColor(col[1], col[2], col[3], col[4] or 1)
+  local icon = ICONS[id]
+  if icon then
+    icon(g, size * 0.5)
+  else
+    g.circle("line", 0, 0, size * 0.32)
+    g.rectangle("fill", -size * 0.06, -size * 0.06, size * 0.12, size * 0.12)
+  end
+  g.pop()
+  g.setColor(1, 1, 1, 1)
+end
+
 -- --------------------------------------------------------------------- draw
 
 function render.draw(r)
@@ -96,6 +270,10 @@ function render.draw(r)
   g.translate(-math.floor(cam.x + cam.shakeX), -math.floor(cam.y + cam.shakeY))
 
   render.drawBackground(r)
+
+  -- An optional world-space layer between the background and the entities.
+  -- The zoo and the range use it to draw their rooms under the action.
+  if render.underlay then render.underlay(r) end
 
   -- Pickups first, so they sit under the things that matter.
   local accent = palette("accent")
@@ -131,7 +309,7 @@ function render.draw(r)
       local blink = math.floor(r.time * 14) % 2 == 0
       g.setColor(flash(base, blink and 0.9 or 0.1))
     end
-    drawShape(e.def.shape, e.x, e.y, e.radius)
+    render.drawShape(e.def.shape, e.x, e.y, e.radius)
 
     dd.circle("colliders", e.x, e.y, e.radius)
     if dd.on.enemyPaths then

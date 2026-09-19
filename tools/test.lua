@@ -1,5 +1,5 @@
 -- Headless tests for the framework's pure-Lua parts.
--- Run from the repo root:  lua5.1 tools/test.lua
+-- Run from the repo root:  luajit tools/test.lua
 --
 -- These cover the config/profile machinery and the game simulation, all of
 -- which are deliberately free of love.graphics so they can run without LÖVE.

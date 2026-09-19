@@ -12,10 +12,13 @@ local config = require("framework.config")
 local profiles = require("framework.profiles")
 local debugdraw = require("framework.debugdraw")
 local ui = require("framework.ui")
+local fonts = require("framework.fonts")
 
 local editor = {}
 
 editor.open = false
+editor.baseWidth = 440
+editor.baseSidebarWidth = 132
 editor.width = 440
 editor.sidebarWidth = 132
 editor.page = nil
@@ -321,6 +324,18 @@ function editor.draw()
 
   local g = love.graphics
   local screenH = g.getHeight()
+
+  -- Everything in the panel is sized off the body font, so raising the text
+  -- size on the UI page widens the panel and the rows with it instead of
+  -- overflowing a fixed-width column.
+  local previousFont = g.getFont()
+  local font = fonts.set("small")
+  local scale = config.values.ui and config.values.ui.fontScale or 1
+  ui.rowHeight = math.max(20, font:getHeight() + 9)
+  ui.pad = math.max(6, math.floor(font:getHeight() * 0.45))
+  editor.width = math.min(g.getWidth() - 40, editor.baseWidth * scale)
+  editor.sidebarWidth = editor.baseSidebarWidth * scale
+
   local width = editor.width
   local sidebar = editor.sidebarWidth
 
@@ -330,18 +345,21 @@ function editor.draw()
   g.line(sidebar + 0.5, 0, sidebar + 0.5, screenH)
 
   -- ---- header
-  local headerH = 52
+  local lineH = font:getHeight() + 2
+  local headerH = lineH * 3 + 10
   ui.panel(0, 0, width, headerH, ui.theme.panel)
   g.setColor(ui.theme.accent)
-  g.print("EDITOR", 8, 6)
+  g.print("EDITOR", 8, 5)
   g.setColor(ui.theme.dim)
-  g.print("F1 close   F2 perf   F3 colliders   F4 overlays", 8, 20)
+  g.print("F1 close   F2 perf   F3 colliders   F4 overlays", 8, 5 + lineH)
   g.setColor(ui.theme.fg)
-  g.print(ui.ellipsise("profile: " .. (profiles.active or "-"), width - 16), 8, 34)
+  g.print(ui.ellipsise("profile: " .. (profiles.active or "-"), width - 16),
+    8, 5 + lineH * 2)
 
   if config.needsRestart() then
     g.setColor(ui.theme.warn)
-    g.print("* restart run to apply", width - 150, 34)
+    local note = "* restart run to apply"
+    g.print(note, width - ui.textWidth(note) - 8, 5 + lineH * 2)
   end
 
   -- ---- sidebar
@@ -371,8 +389,8 @@ function editor.draw()
   end
 
   -- ---- content
-  local contentY = searchY + 28
-  local contentH = screenH - contentY - 26
+  local contentY = searchY + ui.rowHeight + 8
+  local contentH = screenH - contentY - (lineH + 14)
   local innerWidth = ui.beginScroll("editor.content", sidebar + 1, contentY,
     width - sidebar - 1, contentH)
 
@@ -388,20 +406,23 @@ function editor.draw()
   ui.endScroll("editor.content", sidebar + 1, contentY, width - sidebar - 1, contentH)
 
   -- ---- footer
-  local footerY = screenH - 24
-  ui.panel(0, footerY, width, 24, ui.theme.panel)
+  local footerH = lineH + 10
+  local footerY = screenH - footerH
+  ui.panel(0, footerY, width, footerH, ui.theme.panel)
   local now = (love.timer and love.timer.getTime()) or 0
   if editor.message and now < editor.messageUntil then
     g.setColor(ui.theme.accent)
-    g.print(ui.ellipsise(editor.message, width - 16), 8, footerY + 6)
+    g.print(ui.ellipsise(editor.message, width - 16), 8, footerY + 5)
   else
     g.setColor(ui.theme.dim)
-    g.print("* = takes effect on the next run   |  shift-drag a slider for fine control",
-      8, footerY + 6)
+    g.print(ui.ellipsise(
+      "* = takes effect on the next run   |  shift-drag a slider for fine control",
+      width - 16), 8, footerY + 5)
   end
 
   ui.drawDeferred()
   g.setColor(1, 1, 1, 1)
+  if previousFont then g.setFont(previousFont) end
 end
 
 return editor

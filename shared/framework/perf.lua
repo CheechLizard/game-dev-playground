@@ -104,14 +104,21 @@ end
 
 -- ------------------------------------------------------------------ draw
 
-local PANEL_W = 190
-local ROW_H = 10
 
 --- Draw the overlay. Pure love.graphics; safe to skip when headless.
 function perf.draw(x, y, theme)
   if not love or not love.graphics then return end
   local g = love.graphics
   theme = theme or {}
+
+  -- The overlay sizes itself off the UI font, like the editor does, so it
+  -- stays readable when the text size is raised rather than keeping its own
+  -- hardcoded metrics.
+  local fonts = require("framework.fonts")
+  local previousFont = g.getFont()
+  local font = fonts.set("small")
+  local ROW_H = font:getHeight() + 3
+  local PANEL_W = math.max(198, font:getWidth("projectiles") + font:getWidth("0000") + 24)
   local fg = theme.fg or { 0.95, 0.95, 0.95, 1 }
   local dim = theme.dim or { 0.6, 0.6, 0.65, 1 }
   local accent = theme.accent or { 0.35, 0.85, 0.65, 1 }
@@ -120,7 +127,7 @@ function perf.draw(x, y, theme)
   local statRows = (love.graphics.getStats and 6 or 4)
   local scopeRows = #perf.scopeOrder > 0 and (#perf.scopeOrder + 1) or 0
   local counterRows = #perf.counterOrder > 0 and (#perf.counterOrder + 1) or 0
-  local height = 12 + 30 + (statRows + scopeRows + counterRows) * ROW_H
+  local height = 12 + ROW_H * 2.4 + 8 + (statRows + scopeRows + counterRows) * ROW_H
 
   g.setColor(0, 0, 0, 0.72)
   g.rectangle("fill", x, y, PANEL_W, height)
@@ -153,7 +160,7 @@ function perf.draw(x, y, theme)
   row("lua mem", string.format("%.0f KB", collectgarbage("count")), dim)
 
   -- Frame-time graph, oldest on the left.
-  local gx, gy, gw, gh = x + 5, cy + 2, PANEL_W - 10, 26
+  local gx, gy, gw, gh = x + 5, cy + 2, PANEL_W - 10, ROW_H * 2.4
   g.setColor(0, 0, 0, 0.5)
   g.rectangle("fill", gx, gy, gw, gh)
   g.setColor(warn[1], warn[2], warn[3], 0.35)
@@ -191,6 +198,14 @@ function perf.draw(x, y, theme)
   end
 
   g.setColor(1, 1, 1, 1)
+  if previousFont then g.setFont(previousFont) end
+end
+
+--- Width the overlay will draw at, so callers can right-align it.
+function perf.panelWidth()
+  if not (love and love.graphics) then return 198 end
+  local font = require("framework.fonts").role("small")
+  return math.max(198, font:getWidth("projectiles") + font:getWidth("0000") + 24)
 end
 
 return perf

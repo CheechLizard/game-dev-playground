@@ -104,14 +104,34 @@ function sim.play(opts)
     steps = steps + 1
 
     if r.state == runModule.STATE.SHOP then
-      -- Buy the cheapest affordable item repeatedly, then leave.
+      -- Shop by priority, then by price within a priority.
+      --
+      -- Buying strictly cheapest-first was fine when the shop held weapons and
+      -- one heal. With passives in the pool it stops buying weapons at all --
+      -- passives are cheaper -- and the run's damage collapses onto the
+      -- starting weapon, which tells you nothing about how the game plays.
+      -- Filling weapon slots first is both closer to how a person plays and
+      -- closer to the strongest line.
+      local function priority(item)
+        if item.kind == "heal" then
+          -- Only worth it when actually hurt.
+          return (r.player.hp < r:playerStat("maxHp") * 0.5) and 0 or 9
+        end
+        if item.kind == "weapon" then return 1 end
+        if item.kind == "upgrade" then return 2 end
+        return 3   -- passive
+      end
+
       local bought = true
       while bought do
         bought = false
-        local bestIndex, bestCost = nil, math.huge
+        local bestIndex, bestRank, bestCost = nil, math.huge, math.huge
         for i, item in ipairs(r.shop.items) do
-          if not item.bought and item.cost <= r.player.gold and item.cost < bestCost then
-            bestIndex, bestCost = i, item.cost
+          if not item.bought and item.cost <= r.player.gold then
+            local rank = priority(item)
+            if rank < bestRank or (rank == bestRank and item.cost < bestCost) then
+              bestIndex, bestRank, bestCost = i, rank, item.cost
+            end
           end
         end
         if bestIndex then bought = r:shopBuy(bestIndex) or false end
@@ -139,12 +159,23 @@ function sim.run(suite, check, eq, near)
   do
     local r = runModule.new(1)
     eq("starts playing", r.state, runModule.STATE.PLAYING)
-    eq("starts at wave 1", r.wave, 1)
+    eq("starts on the configured starting wave", r.wave, config.get("run.startWave"))
     eq("starts with one weapon", #r.player.weapons, 1)
     eq("starts at full HP", r.player.hp, config.get("player.maxHp"))
-    eq("wave count follows run length and wave length", r:waveCount(),
+    eq("wave count follows run length, wave length and start wave", r:waveCount(),
+      config.get("run.startWave") - 1
+        + math.floor(config.get("run.durationMinutes") * 60
+          / config.get("run.waveSeconds") + 0.5))
+
+    -- Starting later must not shorten the run, only shift the numbering.
+    config.set("run.startWave", 1)
+    local fromOne = runModule.new(1)
+    eq("starting at wave 1 gives the plain wave count", fromOne:waveCount(),
       math.floor(config.get("run.durationMinutes") * 60
         / config.get("run.waveSeconds") + 0.5))
+    eq("run length is unchanged by the start wave",
+      fromOne:durationSeconds(), r:durationSeconds())
+    config.resetKey("run.startWave")
 
     -- Every enemy and weapon in content must have generated settings.
     local content = require("content")
@@ -252,7 +283,15 @@ function sim.run(suite, check, eq, near)
   suite("simulation: a played run")
   do
     -- Long enough to cross a shop boundary at the default 60s waves.
+    --
+    -- The pilot is given a deep HP pool for this one run. The suite is
+    -- checking that a played run produces coherent telemetry -- time moves,
+    -- waves tick, shops open, damage is attributed -- and that should not
+    -- start failing every time someone tunes the difficulty. Balance belongs
+    -- in tools/balance.lua, which reports rather than asserts.
+    config.set("player.maxHp", 5000)
     local r, s = sim.play{ seed = 4242, maxSeconds = 200, dt = 1 / 30 }
+    config.resetKey("player.maxHp")
 
     check("time advanced", r.time > 190, r.time)
     check("waves advanced", r.wave >= 3, r.wave)
@@ -295,11 +334,13 @@ function sim.run(suite, check, eq, near)
 
     config.set("enemy.grunt.hp", 999)
     config.set("scale.eliteChance", 0)   -- elites multiply HP; not what we test here
+    config.set("run.startWave", 1)       -- and so does wave scaling
     local r = runModule.new(2)
     local e = r:spawnEnemy("grunt", 10, 10)
     near("enemy HP comes from the editor value", e.hp, 999, 1e-6)
     config.resetKey("enemy.grunt.hp")
     config.resetKey("scale.eliteChance")
+    config.resetKey("run.startWave")
 
     config.set("weapon.blaster.damage", 50)
     near("weapon damage comes from the editor value",
@@ -313,7 +354,8 @@ function sim.run(suite, check, eq, near)
     config.set("run.waveSeconds", 30)
     local r2 = runModule.new(3)
     eq("wave count follows wave length", r2:waveCount(),
-      math.floor(config.get("run.durationMinutes") * 60 / 30 + 0.5))
+      config.get("run.startWave") - 1
+        + math.floor(config.get("run.durationMinutes") * 60 / 30 + 0.5))
     config.resetKey("run.waveSeconds")
   end
 end

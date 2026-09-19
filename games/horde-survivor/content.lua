@@ -66,10 +66,17 @@ content.enemies = {
   },
   {
     id = "brute", name = "Brute", shape = "block", palette = "enemy",
-    behaviour = "chase",
-    blurb = "Slow, heavy, hits like a truck.",
-    tune = { hp = 70, speed = 19, damage = 22, radius = 7, lp = 4,
-             goldChance = 0.35, hpChance = 0.05, knockback = 0.25, weight = 3 },
+    behaviour = "charge",
+    blurb = "Stalks you, then commits to one devastating slam.",
+    -- A slow chaser cannot threaten a player who is faster than it: you simply
+    -- walk away, and it reads as a bullet sponge rather than a threat. Charging
+    -- keeps the heavy identity (slow stalk, huge hit) while letting it close
+    -- the gap in bursts. Contrast with the Lancer, which dashes often for
+    -- little damage; the Brute winds up slowly and hits like a truck.
+    tune = { hp = 52, speed = 24, damage = 22, radius = 7, lp = 4,
+             goldChance = 0.35, hpChance = 0.05, knockback = 0.25, weight = 3,
+             chargeRange = 150, chargeSpeed = 300, chargeWindup = 0.8,
+             chargeDuration = 0.55, chargeCooldown = 3.2 },
   },
   {
     id = "spitter", name = "Spitter", shape = "diamond", palette = "accent",
@@ -150,8 +157,8 @@ content.weapons = {
     cost = 35, upgradeCost = 26,
   },
   {
-    id = "lance", name = "Rail Lance", kind = "projectile", targeting = "heading",
-    blurb = "Slow, piercing shot along the way you are moving.",
+    id = "lance", name = "Rail Lance", kind = "projectile", targeting = "nearest",
+    blurb = "Slow, heavy shot that skewers everything in a line.",
     tune = { damage = 22, cooldown = 1.5, speed = 300, count = 1, spread = 0,
              pierce = 6, lifetime = 1.4, radius = 3, critChance = 0.15, knockback = 60 },
     perLevel = { damage = 9, cooldown = -0.1, pierce = 0.5 },
@@ -173,6 +180,52 @@ content.weapons = {
     cost = 50, upgradeCost = 30,
   },
 }
+
+-- ----------------------------------------------------------------- passives
+-- Repeatable stat upgrades sold in the shop. Weapons alone cannot fill a shop
+-- of any size: there are only as many weapon offers as there are weapons, so
+-- a bigger shop needs a second kind of choice. Passives are that, and they
+-- give the run a build direction that is not "which gun".
+--
+-- `stat` names a key in player.bonus, so adding one here needs no new plumbing
+-- in run.lua. `amount` is added per purchase.
+
+content.passiveFields = {
+  { name = "amount",     label = "Per purchase",  type = "number", min = 0, max = 200, order = 1 },
+  { name = "cost",       label = "Base cost",     type = "number", min = 0, max = 999, order = 2 },
+  { name = "costGrowth", label = "Cost growth",   type = "number", min = 0, max = 3,   order = 3, format = "%.2f" },
+  { name = "maxStacks",  label = "Max stacks",    type = "int",    min = 1, max = 40,  order = 4 },
+}
+
+content.passives = {
+  { id = "power", name = "Power Cell", stat = "damage",
+    blurb = "Every weapon hits harder.",
+    tune = { amount = 0.10, cost = 30, costGrowth = 0.35, maxStacks = 10 } },
+  { id = "coolant", name = "Coolant", stat = "attackSpeed",
+    blurb = "Everything fires faster.",
+    tune = { amount = 0.08, cost = 32, costGrowth = 0.35, maxStacks = 10 } },
+  { id = "boots", name = "Thrusters", stat = "moveSpeed",
+    blurb = "Outrun what you cannot kill.",
+    tune = { amount = 6, cost = 26, costGrowth = 0.3, maxStacks = 10 } },
+  { id = "plating", name = "Plating", stat = "maxHp",
+    blurb = "More room for error.",
+    tune = { amount = 15, cost = 28, costGrowth = 0.3, maxStacks = 12 } },
+  { id = "resonator", name = "Resonator", stat = "area",
+    blurb = "Wider blades, bigger field, fatter shots.",
+    tune = { amount = 0.08, cost = 34, costGrowth = 0.35, maxStacks = 8 } },
+  { id = "magnet", name = "Magnet", stat = "pickupRange",
+    blurb = "Pulls LP in from further out.",
+    tune = { amount = 10, cost = 22, costGrowth = 0.25, maxStacks = 10 } },
+  { id = "scope", name = "Targeting Chip", stat = "crit",
+    blurb = "Raises every weapon's crit chance.",
+    tune = { amount = 0.04, cost = 36, costGrowth = 0.4, maxStacks = 8 } },
+  { id = "ledger", name = "Ledger", stat = "goldFind",
+    blurb = "More gold from every drop.",
+    tune = { amount = 0.15, cost = 24, costGrowth = 0.3, maxStacks = 8 } },
+}
+
+content.passiveById = {}
+for _, def in ipairs(content.passives) do content.passiveById[def.id] = def end
 
 -- ------------------------------------------------------------- wave table
 -- Which enemies are allowed to spawn from each wave onward. The spawner picks

@@ -7,6 +7,7 @@
 local schema = require("framework.schema")
 local debugdraw = require("framework.debugdraw")
 local content = require("content")
+local sandbox = require("sandbox")
 
 local M = {}
 
@@ -14,8 +15,8 @@ local M = {}
 -- reads roughly in the order you would tune a run: shape the run, then the
 -- player, then what fights the player, then what it all costs.
 local PAGE = {
-  Run = 10, Player = 20, Leveling = 30, Weapons = 40,
-  Enemies = 50, Waves = 60, Economy = 70, Render = 90,
+  Run = 10, Player = 20, Leveling = 30, Weapons = 40, Passives = 45,
+  Enemies = 50, Waves = 60, Economy = 70, Levels = 80, Render = 90,
   Overlays = 95, Debug = 99,
 }
 
@@ -36,11 +37,18 @@ function M.register()
     { key = "run.waveSeconds", label = "Wave length", type = "number",
       default = 60, min = 5, max = 180, unit = "s",
       help = "A wave is a block of spawning. Run length / wave length = wave count." },
+    { key = "run.startWave", label = "Starting wave", type = "int",
+      default = 3, min = 1, max = 30, live = false,
+      help = "The run opens on this wave. Waves 1-2 are a walkover, so the "
+        .. "run starts past them; enemy scaling and unlocks follow this number." },
     { key = "run.wavesPerShop", label = "Waves per shop", type = "int",
-      default = 3, min = 1, max = 10,
+      default = 2, min = 1, max = 10,
       help = "The shop opens after every Nth wave." },
     { key = "run.shopPausesClock", label = "Shop pauses the clock", type = "bool",
       default = true },
+    { key = "run.pauseWithEditor", label = "Pause while the editor is open", type = "bool",
+      default = true,
+      help = "Off lets you watch a value take effect on the live horde." },
   })
 
   register("Run", "Arena", 20, {
@@ -175,7 +183,8 @@ function M.register()
 
   register("Economy", "Shop", 30, {
     { key = "shop.itemCount", label = "Items offered", type = "int",
-      default = 4, min = 1, max = 8 },
+      default = 8, min = 1, max = 12,
+      help = "The shop lays out as a grid, so this reads best at 4, 6 or 8." },
     { key = "shop.rerollCost", label = "Reroll cost", type = "number",
       default = 10, min = 0, max = 200 },
     { key = "shop.rerollGrowth", label = "Reroll cost growth", type = "number",
@@ -234,7 +243,11 @@ function M.register()
       default = 0.03, min = 0, max = 1, format = "%.3f",
       help = "Elites are bigger, tougher and drop more." },
     { key = "scale.eliteHpMult", label = "Elite HP", type = "number",
-      default = 6, min = 1, max = 40, format = "%.1f", unit = "x" },
+      default = 4, min = 1, max = 40, format = "%.1f", unit = "x" },
+    { key = "scale.eliteSpeedMult", label = "Elite speed", type = "number",
+      default = 1.15, min = 0.2, max = 3, format = "%.2f", unit = "x",
+      help = "Elites move faster than their base type. Without this a big "
+        .. "enemy is a slow bullet sponge you simply walk away from." },
     { key = "scale.eliteRewardMult", label = "Elite reward", type = "number",
       default = 5, min = 1, max = 40, format = "%.1f", unit = "x" },
   })
@@ -373,6 +386,26 @@ function M.register()
 
     register("Weapons", def.name, i * 10, settings)
   end
+
+  -- ------------------------------------------------ generated: passives
+  for i, def in ipairs(content.passives) do
+    local settings = {}
+    for _, field in ipairs(content.passiveFields) do
+      local value = def.tune[field.name]
+      if value ~= nil then
+        settings[#settings + 1] = {
+          key = "passive." .. def.id .. "." .. field.name,
+          label = field.label, type = field.type,
+          default = value, min = field.min, max = field.max,
+          unit = field.unit, format = field.format, order = field.order,
+        }
+      end
+    end
+    register("Passives", def.name, i * 10, settings)
+  end
+
+  -- ---------------------------------------------------------- the levels
+  sandbox.registerSettings(schema)
 
   -- ------------------------------------------------------------ overlays
   -- Registered as bool settings on the Overlays page, so they save into
