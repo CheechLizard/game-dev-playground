@@ -242,6 +242,7 @@ function ui.layout(x, y, w)
 end
 
 function ui.cursorY() return cursor.y end
+function ui.cursorRect() return cursor.x, cursor.y, cursor.w end
 function ui.setCursorY(y) cursor.y = y end
 function ui.advance(h) cursor.y = cursor.y + h end
 function ui.space(h) cursor.y = cursor.y + (h or ui.pad) end
@@ -350,6 +351,73 @@ function ui.toggle(id, label, value, opts)
   return value, changed
 end
 
+--- Readout for a numeric value. Never scientific notation: these are numbers
+-- you can now type back in, and "1.2e+03" is not something anyone types.
+local function formatNumber(value, integer)
+  if integer or value == math.floor(value) then
+    return string.format("%d", value)
+  end
+  local s = string.format("%.3f", value)
+  s = s:gsub("0+$", "")
+  s = s:gsub("%.$", "")
+  return s
+end
+
+--- Click a numeric readout to type into it. Shares the text-field focus, so
+-- only one field anywhere owns the keyboard at a time, and while it does the
+-- launcher stops routing keys to the game.
+local function numericEntry(id, value, min, max, x, y, w, h, readout, integer)
+  local focused = keyboardFocus == id
+  local over = hovered(x, y, w, h)
+  if over then hot = id end
+
+  if released() then
+    if over and not focused then
+      keyboardFocus = id
+      textBuffer = tostring(value)
+      focused = true
+    elseif focused and not over then
+      keyboardFocus = nil
+      focused = false
+    end
+  end
+
+  local changed = false
+  if focused then
+    for _, key in ipairs(pendingKeys) do
+      if key == "backspace" then
+        textBuffer = textBuffer:sub(1, -2)
+      elseif key == "return" or key == "kpenter" or key == "tab" then
+        -- Anything unparseable is simply declined; the value stands.
+        local n = tonumber(textBuffer)
+        if n then
+          n = math.max(min, math.min(max, n))
+          if integer then n = math.floor(n + 0.5) end
+          if n ~= value then value, changed = n, true end
+        end
+        keyboardFocus, focused = nil, false
+      elseif key == "escape" then
+        keyboardFocus, focused = nil, false
+      end
+    end
+  end
+
+  local shown = readout
+  if focused then
+    local caret = (math.floor(love.timer.getTime() * 2) % 2 == 0) and "_" or ""
+    shown = textBuffer .. caret
+    love.graphics.setColor(ui.theme.accent)
+    love.graphics.rectangle("line", x + 0.5, y + 0.5, w - 1, h - 1)
+  end
+  -- Keep the tail of a long entry and print it placed, not wrapped: printf
+  -- with a width limit spills onto a second line and over the row below.
+  local limit = w - ui.unit
+  while #shown > 1 and textWidth(shown) > limit do shown = shown:sub(2) end
+  love.graphics.setColor(ui.theme.accent)
+  love.graphics.print(shown, x + w - ui.unit / 2 - textWidth(shown), textY(y, h))
+  return value, changed, focused
+end
+
 --- Horizontal slider with an inline numeric readout. Dragging is relative to
 -- where the drag started, so the handle does not jump on grab.
 function ui.slider(id, label, value, min, max, opts)
@@ -361,12 +429,16 @@ function ui.slider(id, label, value, min, max, opts)
   local changed = false
 
   local readout = opts.format and string.format(opts.format, value)
-    or (opts.integer and string.format("%d", value) or string.format("%.3g", value))
+    or formatNumber(value, opts.integer)
   if opts.unit then readout = readout .. " " .. opts.unit end
 
-  text(ellipsise(label, w - textWidth(readout) - ui.gap), x, textY(y, labelH),
+  local readoutW = math.max(ui.unit * 12, textWidth(readout) + ui.gap)
+  local typed
+  value, typed = numericEntry(id .. ".entry", value, min, max,
+    x + w - readoutW, y, readoutW, labelH, readout, opts.integer)
+  if typed then changed = true end
+  text(ellipsise(label, w - readoutW - ui.gap), x, textY(y, labelH),
     ui.theme.fg)
-  text(readout, x, textY(y, labelH), ui.theme.accent, w, "right")
 
   local over = hovered(x, trackY, w, trackH)
   if over then hot = id end
@@ -396,9 +468,8 @@ function ui.slider(id, label, value, min, max, opts)
   end
 
   local t = (max > min) and ((value - min) / (max - min)) or 0
-  -- Empty track is a halftone well, the filled span solid accent, and the
-  -- handle a full-height foreground tick so it reads against either.
-  rect("fill", x, trackY, w, trackH, ui.tone.raised)
+  -- Outline for the span, solid accent for the filled part, and a full-height
+  -- tick for the handle. The empty part stays empty.
   rect("fill", x, trackY, w * t, trackH, ui.theme.accent)
   love.graphics.setColor(ui.theme.line)
   love.graphics.rectangle("line", x + 0.5, trackY + 0.5, w - 1, trackH - 1)
@@ -433,10 +504,12 @@ function ui.stepper(id, label, value, min, max, step, opts)
     return over and released() and active == bid
   end
 
-  local readout = opts.integer and string.format("%d", value) or string.format("%.4g", value)
+  local readout = formatNumber(value, opts.integer)
   local rx = x + w - btnW * 2 - readoutW - ui.unit
-  rect("fill", rx, y, readoutW, h, ui.theme.panel)
-  text(readout, rx, textY(y, h), ui.theme.accent, readoutW, "center")
+  local typed
+  value, typed = numericEntry(id .. ".entry", value, min, max,
+    rx, y, readoutW, h, readout, opts.integer)
+  if typed then changed = true end
 
   if tinyButton(id .. ".dec", "-", x + w - btnW * 2 - ui.unit) then
     value = math.max(min, value - step) ; changed = true
@@ -612,7 +685,7 @@ end
 
 function ui.endScroll(id, x, y, w, h)
   local offset = scrollOffsets[id] or 0
-  local contentHeight = cursor.y + offset - y
+  local contentHeight = cursor.y - y
   mouse.y = mouse.y - offset
   love.graphics.pop()
   love.graphics.setScissor()
@@ -627,7 +700,8 @@ function ui.endScroll(id, x, y, w, h)
     local barW = ui.unit * 2
     local bx = x + w - barW - ui.unit
     local trackH = h - ui.gap
-    local thumbH = math.max(ui.rowHeight, trackH * (h / contentHeight))
+    local thumbH = math.max(ui.rowHeight,
+      math.min(trackH, trackH * (h / math.max(1, contentHeight))))
     local t = offset / maxOffset
     rect("fill", bx, y + ui.unit, barW, trackH, ui.tone.inert)
     rect("fill", bx, y + ui.unit + (trackH - thumbH) * t, barW, thumbH,

@@ -312,8 +312,8 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   local prefix = (s.mode == "zoo") and ("enemy." .. def.id .. ".")
     or ("weapon." .. def.id .. ".")
 
-  -- Panel sized to the rows it actually holds. The blurb wraps, so its height
-  -- has to be measured rather than assumed to be one line -- guessing put it
+  -- Panel sized to the rows it actually holds. The meta line wraps, so its
+  -- height is measured rather than assumed to be one line -- guessing put it
   -- on top of the first stat row and ran the rows out of the panel.
   local panelW = math.min(viewW * 0.40, 380)
   local innerW = panelW - pad * 2
@@ -322,7 +322,6 @@ function sandbox.drawOverlay(s, scale, ox, oy)
     and ("behaviour: " .. tostring(def.behaviour))
     or ("type: " .. tostring(def.kind) .. "   targeting: " .. tostring(def.targeting))
   local _, metaLines = small:getWrap(metaText, innerW)
-  local _, blurbLines = small:getWrap(def.blurb or "", innerW)
 
   local entries = {}
   for _, field in ipairs(fields) do
@@ -331,7 +330,7 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   end
 
   local headerH = title:getHeight() + 3
-    + (#metaLines + #blurbLines) * small:getHeight() + 8
+    + #metaLines * small:getHeight() + 8
   -- Editable rows are far taller than the readouts they replace, so the panel
   -- takes what it needs up to the view and the rest scrolls.
   local rowH = ui.unit * 9
@@ -357,10 +356,7 @@ function sandbox.drawOverlay(s, scale, ox, oy)
   g.setFont(small)
   g.setColor(1, 1, 1, 0.45)
   g.printf(metaText, x, y, w, "left")
-  y = y + #metaLines * small:getHeight()
-  g.setColor(1, 1, 1, 0.32)
-  g.printf(def.blurb or "", x, y, w, "left")
-  y = y + #blurbLines * small:getHeight() + 8
+  y = y + #metaLines * small:getHeight() + 8
 
   -- The stats are the real settings, drawn with the editor's own widgets, so
   -- a room can be tuned from the corridor and tested by stepping into it.

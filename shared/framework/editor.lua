@@ -102,6 +102,13 @@ end
 -- wherever you meet it and there is only one mapping from type to widget.
 local function drawSetting(entry, width, opts)
   opts = opts or {}
+  -- The reset affordance lives in a gutter reserved on every row, shown only
+  -- when the value is modified. It used to take a row of its own, which made
+  -- the whole list jump the moment you touched a slider.
+  local gutter = ui.unit * 5
+  local cx, cy, cw = ui.cursorRect()
+  ui.layout(cx, cy, cw - gutter)
+
   local value = config.get(entry.key)
   local changed, newValue = false, value
   local label = entry.label or entry.key
@@ -131,14 +138,16 @@ local function drawSetting(entry, width, opts)
 
   if changed then config.set(entry.key, newValue) end
 
-  -- A modified setting gets a reset affordance on its own row.
+  ui.layout(cx, ui.cursorY(), cw)
   if isModified(entry) then
-    local x, y = ui.nextRow(14)
-    if ui.button("reset." .. entry.key, "reset to " .. tostring(
-        entry.type == "color" and "default" or entry.default),
-        { x = x, y = y, width = ui.unit * 30, height = ui.unit * 4 }) then
+    local savedY = ui.cursorY()
+    if ui.button("reset." .. entry.key, "x", {
+        x = cx + cw - gutter + ui.unit / 2, y = cy,
+        width = gutter - ui.unit / 2, height = ui.lineHeight,
+        align = "center" }) then
       config.resetKey(entry.key)
     end
+    ui.setCursorY(savedY)
   end
 
   local showHelp = opts.showHelp
@@ -146,7 +155,7 @@ local function drawSetting(entry, width, opts)
   if entry.help and showHelp then
     ui.label(entry.help, ui.theme.dim, ui.lineHeight)
   end
-  ui.space(3)
+  ui.space(ui.unit)
   return changed
 end
 
