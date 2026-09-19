@@ -7,8 +7,8 @@ and config profiles.
 ```
 love .                      # run the default game
 love . --game horde-survivor
-lua5.1 tools/test.lua       # headless tests (no LÖVE needed)
-lua5.1 tools/balance.lua --runs 5
+luajit tools/test.lua       # headless tests (no LÖVE needed)
+luajit tools/balance.lua --runs 5
 ```
 
 Run from the repo root. That matters: config profiles are written back into
@@ -20,9 +20,10 @@ the working directory is the repo.
 ```
 main.lua               launcher: boots the framework, then the game
 conf.lua               window and LÖVE module setup
-shared/framework/      schema, config, profiles, editor, perf, debugdraw, ui, input
+shared/framework/      schema, config, profiles, editor, perf, debugdraw, ui, input, fonts
+shared/assets/fonts/   pixel fonts used by every screen-space surface
 shared/lib/            json, filesystem shim
-games/horde-survivor/  the first game
+games/horde-survivor/  the first game, plus the zoo and range levels
 config/profiles/       saved config profiles (JSON, committed)
 tools/                 headless tests and the balance harness
 ```
@@ -35,10 +36,43 @@ tools/                 headless tests and the balance harness
 | `F2` | performance overlay |
 | `F3` | collider overlay |
 | `F4` | master switch for all debug overlays |
+| `F5` | zoo — one cage per enemy |
+| `F6` | range — one room per weapon |
 | `WASD` / left stick | move |
+| `P` / `start` | pause |
 | `R` | restart run |
+| `,` `.` | cycle: weapon in the zoo, enemy type on the range |
 
-Firing is automatic.
+Firing is automatic. `F5` and `F6` toggle: press the same key again to go back
+to the run.
+
+No screen prints its own controls. The play surface stays clear, so the keys
+live here rather than on top of the game.
+
+## The zoo and the range
+
+Two inspection levels, both built on the same room grid and both running the
+ordinary simulation, so what you see is what a real run does.
+
+**Zoo** (`F5`) gives every enemy a cage. Walk in and that enemy spawns and
+fights you for real; walk out and the cage empties. `,` and `.` swap which
+weapon you are holding, so you can see how each one handles a given enemy.
+
+**Range** (`F6`) gives every weapon a room. Walk in and you are handed that
+weapon and nothing else. `,` and `.` change which enemy spawns to shoot at.
+
+Both show the live stats for whatever room you are in, read from the config —
+so a number you change in the editor is reflected there immediately. The
+`Levels` page in the editor has the same entrances plus the room settings.
+
+## The shop
+
+The shop lays out as a grid, eight offers by default, mixing weapons and
+upgrades with **passives**: repeatable stat boosts (damage, attack speed, move
+speed, max HP, area, pickup range, crit, gold find). Weapons alone cannot fill
+a shop of any size — there are only as many weapon offers as there are weapons
+— so passives are what make a larger shop a real choice rather than padding.
+Each passive costs more the more you stack it, and caps out.
 
 ## The editor
 
@@ -125,10 +159,10 @@ than reading input, so an entire run can be simulated with no window. That makes
 balance measurable:
 
 ```
-lua5.1 tools/balance.lua --runs 8
-lua5.1 tools/balance.lua --profile brutal --runs 5
-lua5.1 tools/balance.lua --bubble 70       # how close the scripted pilot plays
-lua5.1 tools/balance.lua --csv out.csv
+luajit tools/balance.lua --runs 8
+luajit tools/balance.lua --profile brutal --runs 5
+luajit tools/balance.lua --bubble 70       # how close the scripted pilot plays
+luajit tools/balance.lua --csv out.csv
 ```
 
 The pilot is a scripted approximation, not a good player. Its `--bubble`

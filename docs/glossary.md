@@ -25,6 +25,8 @@ retired, update it here too.
 | **Action** | A named input intent (rather than a raw key or button), so keyboard and gamepad feed one path. Consumed once per frame. | `input.press`, `input.consume` |
 | **Letterbox** | The integer-scaled centring of the fixed-size render canvas within the window. Integer-only: a fractional scale makes pixel art shimmer. | `recomputeLetterbox` in `main.lua` |
 | **Canvas** | The fixed-size offscreen render target sized by `render.width`/`render.height`, drawn letterboxed into the window. | `rebuildCanvas` in `main.lua` |
+| **Role** | What calling code asks fonts for — `title`, `heading`, `body`, `small` — rather than naming a family and size. One setting then resizes every surface at once. | `fonts.role`, `shared/framework/fonts.lua` |
+| **Family** | One pixel font file plus the design size its glyphs were drawn at. Requested sizes snap to a multiple of that step, or the stems break up. | `fonts.families`, `step` |
 | **Launcher** | `main.lua`. Owns boot order: schema → `config.build` → `profiles.init` → game. | `main.lua`, `love.load` |
 
 ## horde-survivor
@@ -41,12 +43,20 @@ retired, update it here too.
 | **Pickup** | A dropped item on the ground, tagged by `kind` (`lp`, `gold`, `heal`). Flies to the player inside the pickup radius; gold and health expire, LP never does. | `pk.kind` in `run.lua` |
 | **Elite** | A rolled-up enemy variant: more HP, larger radius, bigger reward. Rolled per spawn against `scale.eliteChance`. | `enemy.elite`, `scale.eliteHpMult`, `scale.eliteRewardMult` |
 | **Shop item** | An offer in the shop, tagged by `kind` (`weapon`, `upgrade`, `heal`). Rerollable for gold. | `kind` in `run.lua:325`, `shop.rerollCost` |
+| **Passive** | A repeatable stat upgrade sold in the shop, as opposed to a weapon. `stat` names a key in `player.bonus`, so a new one needs no new plumbing. Stacks, priced higher each time, capped. | `content.passives`, `run:addPassive`, `player.passives` |
+| **Stack** | One purchase of a passive. The count drives both its price and its cap. | `run:passiveCost`, `maxStacks` |
+| **Sandbox** | A run with `sandbox` set: no wave spawning, no wave clock, no win or lose timer. Everything else behaves exactly as in a real run. Backs the zoo and the range. | `run.sandbox`, `games/horde-survivor/sandbox.lua` |
+| **Zoo** | The inspection level with one cage per enemy. `F5`. | `sandbox.new("zoo")` |
+| **Range** | The inspection level with one room per weapon. `F6`. | `sandbox.new("range")` |
+| **Room** / **Cage** | One cell of a sandbox level's grid. A room is live only while the player is standing in it. | `sandbox.rooms`, `roomAt` |
+| **Specimen** | The still sprite shown in an idle room, so you can see what lives there without walking in. Hidden once the room goes live. | `sandbox.draw` |
+| **Underlay** | An optional world-space layer drawn between the background and the entities. The sandbox rooms use it. | `render.underlay` |
 | **Seeded rng** | The run's own generator, so a given seed reproduces a run exactly in both tests and the game. Deliberately not `math.random`. | `makeRng` in `run.lua` |
 
 ## Tooling
 
 | Term | Meaning | Code |
 |---|---|---|
-| **Headless** | Running simulation or tests with no LÖVE window, under plain Lua 5.1. | `tools/test.lua` |
+| **Headless** | Running simulation or tests with no LÖVE window, under a Lua 5.1-compatible interpreter. Use `luajit`: Homebrew dropped `lua@5.1`, and LuaJIT is the VM LÖVE itself runs. | `tools/test.lua` |
 | **Sim suite** | Headless driver that plays runs to completion for balance checking. | `tools/simsuite.lua` |
 | **Balance harness** | Batch runner over the sim suite, reporting aggregate outcomes across many runs. | `tools/balance.lua --runs N` |

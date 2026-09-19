@@ -31,12 +31,14 @@ resolves against the root, and profile saves are written back into
 `config/profiles/` so they land in git rather than in an app-support directory.
 `love games/horde-survivor` will fail.
 
-Lua 5.1 is optional but useful — it runs the tests and the balance harness with
-no display:
+A Lua 5.1-compatible interpreter is optional but useful — it runs the tests and
+the balance harness with no display. Homebrew dropped the `lua@5.1` formula, so
+use LuaJIT, which is 5.1-compatible and is the VM LÖVE itself runs:
 
 ```bash
-lua5.1 tools/test.lua        # 96 tests, ~5s
-lua5.1 tools/balance.lua --runs 5
+brew install luajit
+luajit tools/test.lua        # 98 tests, ~5s
+luajit tools/balance.lua --runs 5
 ```
 
 ## Do this first
