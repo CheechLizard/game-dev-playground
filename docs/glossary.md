@@ -28,6 +28,9 @@ retired, update it here too.
 | **Role** | What calling code asks fonts for — `title`, `heading`, `body`, `small` — rather than naming a family and size. One setting then resizes every surface at once. | `fonts.role`, `shared/framework/fonts.lua` |
 | **Family** | One pixel font file plus the design size its glyphs were drawn at. Requested sizes snap to a multiple of that step, or the stems break up. | `fonts.families`, `step` |
 | **Launcher** | `main.lua`. Owns boot order: schema → `config.build` → `profiles.init` → game. | `main.lua`, `love.load` |
+| **Halftone** | An intermediate tone in the UI, drawn as an ordered dither of the foreground rather than as a grey. The pattern is anchored to the screen, so two fills of the same density that meet read as one surface. Never behind text: the stipple and the glyphs are the same white. | `ui.halftone`, `ui.tone` |
+| **Tone** | A named halftone density — `inert`, `raised`, `hover`, `heavy`. Passed to a fill where a colour would otherwise go, so no widget invents its own shading. | `ui.tone` |
+| **Unit** | The UI spacing base, 4px, multiplied by `ui.fontScale`. Every offset in the interface is a multiple of it, so the rhythm holds at 2x and 3x instead of the text growing while the gaps stay put. | `ui.unit`, `ui.BASE_UNIT`, `ui.pad`, `ui.gap`, `ui.sectionGap` |
 
 ## horde-survivor
 
@@ -46,6 +49,7 @@ retired, update it here too.
 | **Passive** | A repeatable stat upgrade sold in the shop, as opposed to a weapon. `stat` names a key in `player.bonus`, so a new one needs no new plumbing. Stacks, priced higher each time, capped. | `content.passives`, `run:addPassive`, `player.passives` |
 | **Stack** | One purchase of a passive. The count drives both its price and its cap. | `run:passiveCost`, `maxStacks` |
 | **Sandbox** | A run with `sandbox` set: no wave spawning, no wave clock, no win or lose timer. Everything else behaves exactly as in a real run. Backs the zoo and the range. | `run.sandbox`, `games/horde-survivor/sandbox.lua` |
+| **Pause menu** | The pause screen, which doubles as the level picker: resume, the run, the zoo, the range. `P`. An editor-induced freeze shows only the word PAUSED instead, so the panel being worked in is not covered. | `drawPauseMenu` in `game.lua` |
 | **Zoo** | The inspection level with one cage per enemy. `F5`. | `sandbox.new("zoo")` |
 | **Range** | The inspection level with one room per weapon. `F6`. | `sandbox.new("range")` |
 | **Room** / **Cage** | One cell of a sandbox level's grid. A room is live only while the player is standing in it. | `sandbox.rooms`, `roomAt` |

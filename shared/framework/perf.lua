@@ -115,10 +115,12 @@ function perf.draw(x, y, theme)
   -- stays readable when the text size is raised rather than keeping its own
   -- hardcoded metrics.
   local fonts = require("framework.fonts")
+  local ui = require("framework.ui")
   local previousFont = g.getFont()
   local font = fonts.set("small")
-  local ROW_H = font:getHeight() + 3
-  local PANEL_W = math.max(198, font:getWidth("projectiles") + font:getWidth("0000") + 24)
+  local ROW_H = font:getHeight() + ui.unit
+  local PANEL_W = math.max(ui.unit * 50,
+    font:getWidth("projectiles") + font:getWidth("0000") + ui.unit * 6)
   local fg = theme.fg or { 0.95, 0.95, 0.95, 1 }
   local dim = theme.dim or { 0.6, 0.6, 0.65, 1 }
   local accent = theme.accent or { 0.35, 0.85, 0.65, 1 }

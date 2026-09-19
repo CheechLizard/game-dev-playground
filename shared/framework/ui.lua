@@ -7,25 +7,88 @@
 -- The editor draws in screen space, after the pixel-art canvas has been
 -- scaled up, so everything here works in real pixels.
 
+local schema = require("framework.schema")
+local config = require("framework.config")
+
 local ui = {}
 
-ui.theme = {
-  bg        = { 0.07, 0.07, 0.10, 0.96 },
-  panel     = { 0.11, 0.11, 0.15, 1 },
-  raised    = { 0.17, 0.17, 0.23, 1 },
-  hover     = { 0.24, 0.24, 0.32, 1 },
-  activeBg  = { 0.30, 0.30, 0.42, 1 },
-  accent    = { 0.35, 0.85, 0.65, 1 },
-  accentDim = { 0.20, 0.45, 0.38, 1 },
-  fg        = { 0.92, 0.92, 0.95, 1 },
-  dim       = { 0.55, 0.56, 0.64, 1 },
-  warn      = { 0.95, 0.55, 0.30, 1 },
-  danger    = { 0.90, 0.32, 0.38, 1 },
-  line      = { 0.22, 0.22, 0.30, 1 },
+-- ------------------------------------------------------------------ theme
+--
+-- The interface is one bit deep plus an accent: a black ground, white text
+-- and lines, and a single accent for selection and emphasis. Every tone in
+-- between is a halftone dither of the foreground rather than a grey, so the
+-- whole UI stays in three registered colours however many states it grows.
+--
+-- These are schema settings like everything else. ui.theme is a cache rebuilt
+-- from them each frame, not a second list of colours to keep in sync.
+
+function ui.registerSettings()
+  schema.register{
+    page = "UI", section = "Theme", order = 85, sectionOrder = 20,
+    settings = {
+      { key = "ui.background", label = "Background", type = "color",
+        default = { 0, 0, 0, 1 } },
+      { key = "ui.foreground", label = "Text and lines", type = "color",
+        default = { 1, 1, 1, 1 } },
+      { key = "ui.accent", label = "Accent", type = "color",
+        default = { 0.361, 0.831, 0.639, 1 },
+        help = "The only colour besides the background and the foreground. "
+          .. "Selection, values and emphasis. Everything between the two is "
+          .. "halftone dither, not a grey." },
+    },
+  }
+end
+
+ui.theme = {}
+
+local function syncTheme()
+  local c = config.values.ui
+  if not c or not c.background then return end
+  local t = ui.theme
+  t.background = c.background
+  t.fg         = c.foreground
+  t.accent     = c.accent
+  t.line       = c.foreground
+  -- No greys: de-emphasis comes from layout and density, never from colour.
+  t.dim        = c.foreground
+  t.warn       = c.accent
+  t.danger     = c.accent
+  t.panel      = c.background
+  t.bg         = { c.background[1], c.background[2], c.background[3], 0.96 }
+end
+
+-- Fill densities, not colours: a halftone of the foreground. Passed to rect()
+-- wherever a surface needs to read as raised, hovered or inert.
+ui.tone = {
+  inert  = 0.12,
+  raised = 0.25,
+  hover  = 0.5,
+  heavy  = 0.75,
 }
 
-ui.rowHeight = 20
-ui.pad = 6
+-- ---------------------------------------------------------------- spacing
+--
+-- One contract for every surface. Each offset is a multiple of ui.unit, and
+-- ui.unit tracks ui.fontScale so the rhythm survives at 2x and 3x instead of
+-- the text growing while the gaps stay put. Nothing here uses a raw pixel.
+--
+--   unit 4 . pad 8 . gap 8 . sectionGap 16 . lineHeight 16 . rowHeight 20
+--
+ui.BASE_UNIT = 4
+
+local function syncMetrics()
+  local s = (config.values.ui and config.values.ui.fontScale) or 1
+  local u = ui.BASE_UNIT * s
+  ui.unit       = u
+  ui.rowGap     = u          -- between stacked rows
+  ui.pad        = u * 2      -- panel edge to content, and row inset
+  ui.gap        = u * 2      -- between related items
+  ui.sectionGap = u * 4      -- between unrelated blocks
+  ui.lineHeight = u * 4
+  ui.rowHeight  = u * 5
+end
+
+syncMetrics()
 
 -- ------------------------------------------------------------- mouse state
 
@@ -40,6 +103,8 @@ local scissorStack = {}
 local openDropdown = nil
 
 function ui.beginFrame()
+  syncTheme()
+  syncMetrics()
   mouse.prevDown = mouse.down
   if love and love.mouse then
     mouse.x, mouse.y = love.mouse.getPosition()
@@ -83,9 +148,59 @@ end
 
 -- ----------------------------------------------------------------- drawing
 
-local function rect(mode, x, y, w, h, colour, radius)
-  love.graphics.setColor(colour)
-  love.graphics.rectangle(mode, x, y, w, h, radius or 0)
+-- ----------------------------------------------------------------- dither
+--
+-- A 4x4 ordered (Bayer) pattern per density, tiled. The pattern is anchored
+-- to the screen rather than to the rect being filled, so two fills of the
+-- same density that meet read as one continuous tone with no seam at the
+-- join. The cell scales with ui.unit, or the weave would dissolve into noise
+-- at 2x and 3x.
+local BAYER = {
+   0,  8,  2, 10,
+  12,  4, 14,  6,
+   3, 11,  1,  9,
+  15,  7, 13,  5,
+}
+local patterns = {}
+local ditherQuad
+
+local function pattern(level)
+  if patterns[level] then return patterns[level] end
+  local data = love.image.newImageData(4, 4)
+  for i = 0, 15 do
+    local on = BAYER[i + 1] < level
+    data:setPixel(i % 4, math.floor(i / 4), 1, 1, 1, on and 1 or 0)
+  end
+  local img = love.graphics.newImage(data)
+  img:setFilter("nearest", "nearest")
+  img:setWrap("repeat", "repeat")
+  patterns[level] = img
+  return img
+end
+
+--- Fill a rect with a halftone of `colour` (default foreground) at `density`.
+function ui.halftone(x, y, w, h, density, colour)
+  if w <= 0 or h <= 0 then return end
+  local level = math.max(0, math.min(16, math.floor(density * 16 + 0.5)))
+  if level <= 0 then return end
+  local s = math.max(1, ui.unit / ui.BASE_UNIT)
+  ditherQuad = ditherQuad or love.graphics.newQuad(0, 0, 1, 1, 4, 4)
+  ditherQuad:setViewport((x / s) % 4, (y / s) % 4, w / s, h / s, 4, 4)
+  love.graphics.setColor(colour or ui.theme.fg)
+  love.graphics.draw(pattern(level), ditherQuad, x, y, 0, s, s)
+end
+
+--- `fill` is a colour table (solid) or a number 0..1 (halftone of the
+-- foreground). One entry point, so no widget invents its own shading.
+-- Corners are square: rounding does not survive a one-bit dither.
+local function rect(mode, x, y, w, h, fill)
+  if fill == nil then return end
+  if type(fill) == "number" then
+    ui.halftone(x, y, w, h, fill)
+    return
+  end
+  love.graphics.setColor(fill)
+  love.graphics.rectangle(mode, x, y, w, h)
 end
 
 local function text(str, x, y, colour, limit, align)
@@ -99,6 +214,12 @@ end
 
 local function textWidth(str)
   return love.graphics.getFont():getWidth(str)
+end
+
+--- Baseline for a single line vertically centred in a row of height h. Every
+-- widget uses this rather than its own magic offset.
+local function textY(y, h)
+  return y + math.floor((h - love.graphics.getFont():getHeight()) / 2)
 end
 
 --- Trim a string to fit a pixel width, with an ellipsis.
@@ -127,7 +248,7 @@ function ui.space(h) cursor.y = cursor.y + (h or ui.pad) end
 
 local function nextRow(height)
   local x, y, w = cursor.x, cursor.y, cursor.w
-  cursor.y = cursor.y + (height or ui.rowHeight) + 2
+  cursor.y = cursor.y + (height or ui.rowHeight) + ui.rowGap
   return x, y, w
 end
 
@@ -140,23 +261,26 @@ function ui.panel(x, y, w, h, colour)
 end
 
 function ui.label(str, colour, height)
-  local x, y, w = nextRow(height or 16)
-  text(ellipsise(str, w), x, y + 2, colour or ui.theme.fg)
+  local h = height or ui.lineHeight
+  local x, y, w = nextRow(h)
+  text(ellipsise(str, w), x, textY(y, h), colour or ui.theme.fg)
   return x, y, w
 end
 
 function ui.heading(str)
-  local x, y, w = nextRow(20)
-  text(str:upper(), x, y + 4, ui.theme.accent)
+  local h = ui.rowHeight
+  local x, y, w = nextRow(h)
+  text(str:upper(), x, textY(y, h - ui.unit), ui.theme.accent)
   love.graphics.setColor(ui.theme.line)
-  love.graphics.line(x, y + 18, x + w, y + 18)
+  love.graphics.line(x, y + h - 1, x + w, y + h - 1)
   return x, y, w
 end
 
 function ui.separator()
-  local x, y, w = nextRow(6)
+  local h = ui.gap
+  local x, y, w = nextRow(h)
   love.graphics.setColor(ui.theme.line)
-  love.graphics.line(x, y + 3, x + w, y + 3)
+  love.graphics.line(x, y + h / 2, x + w, y + h / 2)
 end
 
 --- A button. Pass width to override the full row.
@@ -173,20 +297,26 @@ function ui.button(id, caption, opts)
   if over and clicked() then active = id end
   local fired = over and released() and active == id
 
-  local bg = ui.theme.raised
-  if opts.tone == "accent" then bg = ui.theme.accentDim end
-  if opts.tone == "danger" then bg = { 0.35, 0.14, 0.17, 1 } end
-  if opts.selected then bg = ui.theme.activeBg end
-  if over then bg = ui.theme.hover end
-  if active == id and over then bg = ui.theme.activeBg end
-  if opts.disabled then bg = { 0.13, 0.13, 0.16, 1 } end
-
-  rect("fill", x, y, w, h, bg, 2)
-  local fg = opts.disabled and ui.theme.dim
-    or (opts.tone == "danger" and ui.theme.danger)
-    or (opts.selected and ui.theme.accent)
-    or ui.theme.fg
-  text(ellipsise(caption, w - 8), x + 4, y + (h - 12) / 2, fg, w - 8, opts.align or "left")
+  -- Solid accent means "this one is chosen or being pressed". Everything
+  -- else is a halftone, with an outline to mark hover. Text sits on top in
+  -- the foreground, or the background when the cell underneath is solid.
+  local solid = opts.selected or opts.tone == "accent" or (active == id and over)
+  -- Nothing dithers behind a label: a halftone and the text are the same
+  -- white, so the glyphs dissolve into it. Rest is bare, hover takes a fill
+  -- and an outline, and the chosen row goes solid accent with dark text.
+  local fill = solid and ui.theme.accent or (over and ui.tone.raised or nil)
+  rect("fill", x, y, w, h, fill)
+  if over and not solid then
+    love.graphics.setColor(ui.theme.fg)
+    love.graphics.rectangle("line", x + 0.5, y + 0.5, w - 1, h - 1)
+  end
+  local fg = solid and ui.theme.background or ui.theme.fg
+  text(ellipsise(caption, w - ui.pad), x + ui.unit, textY(y, h), fg,
+    w - ui.pad, opts.align or "left")
+  if opts.disabled then
+    -- Screen-door the cell back instead of tinting the text grey.
+    ui.halftone(x, y, w, h, 0.5, ui.theme.background)
+  end
 
   return (fired and not opts.disabled) or false
 end
@@ -204,14 +334,18 @@ function ui.toggle(id, label, value, opts)
   end
   if over and clicked() then active = id end
 
-  local boxW, boxH = 26, 12
+  local boxH = ui.unit * 3
+  local boxW = boxH * 2
   local bx = x + w - boxW
-  rect("fill", x, y, w, h, over and ui.theme.raised or { 0, 0, 0, 0 }, 2)
-  text(ellipsise(label, w - boxW - 8), x + 4, y + 4, ui.theme.fg)
-  rect("fill", bx, y + (h - boxH) / 2, boxW, boxH,
-    value and ui.theme.accentDim or ui.theme.raised, boxH / 2)
-  rect("fill", value and (bx + boxW - boxH + 1) or (bx + 1), y + (h - boxH) / 2 + 1,
-    boxH - 2, boxH - 2, value and ui.theme.accent or ui.theme.dim, (boxH - 2) / 2)
+  local by = y + (h - boxH) / 2
+  if over then rect("fill", x, y, w, h, ui.tone.inert) end
+  text(ellipsise(label, w - boxW - ui.gap), x + ui.unit, textY(y, h), ui.theme.fg)
+  -- Track is a halftone well; the knob is solid, accent when on.
+  rect("fill", bx, by, boxW, boxH, ui.tone.raised)
+  love.graphics.setColor(ui.theme.line)
+  love.graphics.rectangle("line", bx + 0.5, by + 0.5, boxW - 1, boxH - 1)
+  rect("fill", value and (bx + boxW - boxH) or bx, by, boxH, boxH,
+    value and ui.theme.accent or ui.theme.fg)
 
   return value, changed
 end
@@ -220,18 +354,19 @@ end
 -- where the drag started, so the handle does not jump on grab.
 function ui.slider(id, label, value, min, max, opts)
   opts = opts or {}
-  local x, y, w = nextRow(opts.height or 30)
-  local labelH = 14
+  local x, y, w = nextRow(opts.height or (ui.unit * 7))
+  local labelH = ui.lineHeight
   local trackY = y + labelH
-  local trackH = 12
+  local trackH = ui.unit * 3
   local changed = false
 
   local readout = opts.format and string.format(opts.format, value)
     or (opts.integer and string.format("%d", value) or string.format("%.3g", value))
   if opts.unit then readout = readout .. " " .. opts.unit end
 
-  text(ellipsise(label, w - textWidth(readout) - 10), x, y, ui.theme.fg)
-  text(readout, x, y, ui.theme.accent, w, "right")
+  text(ellipsise(label, w - textWidth(readout) - ui.gap), x, textY(y, labelH),
+    ui.theme.fg)
+  text(readout, x, textY(y, labelH), ui.theme.accent, w, "right")
 
   local over = hovered(x, trackY, w, trackH)
   if over then hot = id end
@@ -261,11 +396,16 @@ function ui.slider(id, label, value, min, max, opts)
   end
 
   local t = (max > min) and ((value - min) / (max - min)) or 0
-  rect("fill", x, trackY, w, trackH, ui.theme.raised, 2)
-  rect("fill", x, trackY, w * t, trackH,
-    (active == id or over) and ui.theme.accent or ui.theme.accentDim, 2)
-  local hx = x + math.max(2, math.min(w - 2, w * t))
-  rect("fill", hx - 2, trackY - 1, 4, trackH + 2, ui.theme.fg, 1)
+  -- Empty track is a halftone well, the filled span solid accent, and the
+  -- handle a full-height foreground tick so it reads against either.
+  rect("fill", x, trackY, w, trackH, ui.tone.raised)
+  rect("fill", x, trackY, w * t, trackH, ui.theme.accent)
+  love.graphics.setColor(ui.theme.line)
+  love.graphics.rectangle("line", x + 0.5, trackY + 0.5, w - 1, trackH - 1)
+  local hw = math.max(2, ui.unit / 2)
+  local hx = x + math.max(hw, math.min(w - hw, w * t))
+  rect("fill", hx - hw / 2, trackY - ui.unit / 2, hw, trackH + ui.unit,
+    ui.theme.fg)
 
   return value, changed
 end
@@ -275,26 +415,30 @@ function ui.stepper(id, label, value, min, max, step, opts)
   opts = opts or {}
   local x, y, w = nextRow()
   local h = ui.rowHeight
-  local btnW = 20
+  local btnW = ui.rowHeight
+  local readoutW = ui.unit * 11
   local changed = false
 
-  text(ellipsise(label, w - btnW * 2 - 60), x, y + 4, ui.theme.fg)
+  text(ellipsise(label, w - btnW * 2 - readoutW - ui.gap), x, textY(y, h),
+    ui.theme.fg)
 
   local function tinyButton(bid, caption, bx)
     local over = hovered(bx, y, btnW, h)
     if over then hot = bid end
     if over and clicked() then active = bid end
-    rect("fill", bx, y, btnW, h, over and ui.theme.hover or ui.theme.raised, 2)
-    text(caption, bx, y + 4, ui.theme.fg, btnW, "center")
+    rect("fill", bx, y, btnW, h, over and ui.tone.raised or nil)
+    love.graphics.setColor(ui.theme.line)
+    love.graphics.rectangle("line", bx + 0.5, y + 0.5, btnW - 1, h - 1)
+    text(caption, bx, textY(y, h), ui.theme.fg, btnW, "center")
     return over and released() and active == bid
   end
 
   local readout = opts.integer and string.format("%d", value) or string.format("%.4g", value)
-  local rx = x + w - btnW * 2 - 46
-  rect("fill", rx, y, 44, h, ui.theme.panel, 2)
-  text(readout, rx, y + 4, ui.theme.accent, 44, "center")
+  local rx = x + w - btnW * 2 - readoutW - ui.unit
+  rect("fill", rx, y, readoutW, h, ui.theme.panel)
+  text(readout, rx, textY(y, h), ui.theme.accent, readoutW, "center")
 
-  if tinyButton(id .. ".dec", "-", x + w - btnW * 2 - 2) then
+  if tinyButton(id .. ".dec", "-", x + w - btnW * 2 - ui.unit) then
     value = math.max(min, value - step) ; changed = true
   end
   if tinyButton(id .. ".inc", "+", x + w - btnW) then
@@ -308,11 +452,11 @@ function ui.dropdown(id, label, value, values, opts)
   opts = opts or {}
   local x, y, w = nextRow()
   local h = ui.rowHeight
-  local boxW = math.min(140, w * 0.55)
+  local boxW = math.min(ui.unit * 35, w * 0.55)
   local bx = x + w - boxW
   local changed = false
 
-  text(ellipsise(label, w - boxW - 8), x, y + 4, ui.theme.fg)
+  text(ellipsise(label, w - boxW - ui.gap), x, textY(y, h), ui.theme.fg)
 
   local over = hovered(bx, y, boxW, h)
   if over then hot = id end
@@ -321,9 +465,12 @@ function ui.dropdown(id, label, value, values, opts)
       or { id = id, x = bx, y = y + h, w = boxW, values = values, value = value }
   end
 
-  rect("fill", bx, y, boxW, h, over and ui.theme.hover or ui.theme.raised, 2)
-  text(ellipsise(tostring(value), boxW - 20), bx + 4, y + 4, ui.theme.accent)
-  text("v", bx + boxW - 12, y + 4, ui.theme.dim)
+  rect("fill", bx, y, boxW, h, over and ui.tone.raised or nil)
+  love.graphics.setColor(ui.theme.line)
+  love.graphics.rectangle("line", bx + 0.5, y + 0.5, boxW - 1, h - 1)
+  text(ellipsise(tostring(value), boxW - ui.unit * 5), bx + ui.unit,
+    textY(y, h), ui.theme.accent)
+  text("v", bx + boxW - ui.unit * 3, textY(y, h), ui.theme.fg)
 
   -- A pick made last frame is reported now, once the list has been drawn.
   if ui.dropdownResult and ui.dropdownResult.id == id then
@@ -339,14 +486,15 @@ function ui.drawDeferred()
   if not openDropdown then return end
   local d = openDropdown
   local h = ui.rowHeight
-  local total = #d.values * h + 4
-  rect("fill", d.x - 1, d.y - 1, d.w + 2, total + 2, ui.theme.line, 2)
-  rect("fill", d.x, d.y, d.w, total, ui.theme.panel, 2)
+  local total = #d.values * h + ui.unit
+  rect("fill", d.x, d.y, d.w, total, ui.theme.panel)
+  love.graphics.setColor(ui.theme.line)
+  love.graphics.rectangle("line", d.x + 0.5, d.y + 0.5, d.w - 1, total - 1)
   for i, option in ipairs(d.values) do
-    local oy = d.y + 2 + (i - 1) * h
+    local oy = d.y + ui.unit / 2 + (i - 1) * h
     local over = inside(d.x, oy, d.w, h)
-    if over then rect("fill", d.x, oy, d.w, h, ui.theme.hover) end
-    text(ellipsise(tostring(option), d.w - 8), d.x + 4, oy + 4,
+    if over then rect("fill", d.x, oy, d.w, h, ui.tone.raised) end
+    text(ellipsise(tostring(option), d.w - ui.pad), d.x + ui.unit, textY(oy, h),
       option == d.value and ui.theme.accent or ui.theme.fg)
     if over and released() then
       ui.dropdownResult = { id = d.id, value = option }
@@ -366,18 +514,20 @@ function ui.dropdownOpen() return openDropdown ~= nil end
 function ui.color(id, label, value)
   local changed = false
   local x, y, w = nextRow()
-  local swatch = 16
-  text(ellipsise(label, w - swatch - 8), x, y + 4, ui.theme.fg)
-  rect("fill", x + w - swatch, y + 2, swatch, swatch,
-    { value[1], value[2], value[3], value[4] or 1 }, 2)
+  local h = ui.rowHeight
+  local swatch = ui.lineHeight
+  local sy = y + (h - swatch) / 2
+  text(ellipsise(label, w - swatch - ui.gap), x, textY(y, h), ui.theme.fg)
+  rect("fill", x + w - swatch, sy, swatch, swatch,
+    { value[1], value[2], value[3], value[4] or 1 })
   love.graphics.setColor(ui.theme.line)
-  love.graphics.rectangle("line", x + w - swatch + 0.5, y + 2.5, swatch - 1, swatch - 1)
+  love.graphics.rectangle("line", x + w - swatch + 0.5, sy + 0.5, swatch - 1, swatch - 1)
 
   local names = { "R", "G", "B" }
   local out = { value[1], value[2], value[3], value[4] or 1 }
   for i = 1, 3 do
     local v, c = ui.slider(id .. "." .. i, names[i], out[i], 0, 1,
-      { height = 26, format = "%.2f" })
+      { height = ui.unit * 7, format = "%.2f" })
     if c then out[i] = v ; changed = true end
   end
   return out, changed
@@ -388,12 +538,12 @@ function ui.textField(id, label, value, opts)
   opts = opts or {}
   local x, y, w = nextRow()
   local h = ui.rowHeight
-  local boxW = opts.width or math.min(180, w * 0.6)
+  local boxW = opts.width or math.min(ui.unit * 45, w * 0.6)
   local bx = x + w - boxW
   local committed = false
 
   if label and label ~= "" then
-    text(ellipsise(label, w - boxW - 8), x, y + 4, ui.theme.fg)
+    text(ellipsise(label, w - boxW - ui.gap), x, textY(y, h), ui.theme.fg)
   end
 
   local over = hovered(bx, y, boxW, h)
@@ -427,14 +577,11 @@ function ui.textField(id, label, value, opts)
   end
 
   local shown = (keyboardFocus == id) and textBuffer or (value or "")
-  rect("fill", bx, y, boxW, h, keyboardFocus == id and ui.theme.activeBg or ui.theme.raised, 2)
-  if keyboardFocus == id then
-    love.graphics.setColor(ui.theme.accent)
-    love.graphics.rectangle("line", bx + 0.5, y + 0.5, boxW - 1, h - 1, 2)
-  end
+  love.graphics.setColor(keyboardFocus == id and ui.theme.accent or ui.theme.line)
+  love.graphics.rectangle("line", bx + 0.5, y + 0.5, boxW - 1, h - 1)
   local caret = (keyboardFocus == id and math.floor(love.timer.getTime() * 2) % 2 == 0) and "_" or ""
-  text(ellipsise(shown .. caret, boxW - 8), bx + 4, y + 4,
-    shown == "" and ui.theme.dim or ui.theme.fg)
+  text(ellipsise(shown .. caret, boxW - ui.pad), bx + ui.unit, textY(y, h),
+    ui.theme.fg)
 
   return value, committed
 end
@@ -447,7 +594,7 @@ local scrollOffsets = {}
 function ui.beginScroll(id, x, y, w, h)
   local offset = scrollOffsets[id] or 0
   if hovered(x, y, w, h) and mouse.wheel ~= 0 then
-    offset = offset - mouse.wheel * 34
+    offset = offset - mouse.wheel * (ui.rowHeight + ui.rowGap) * 1.5
   end
 
   scissorStack[#scissorStack + 1] = { x = x, y = y, w = w, h = h }
@@ -458,7 +605,7 @@ function ui.beginScroll(id, x, y, w, h)
   mouse.y = mouse.y + offset
 
   scrollOffsets[id] = offset
-  local barW = 6
+  local barW = ui.unit * 2
   ui.layout(x + ui.pad, y + ui.pad, w - ui.pad * 2 - barW)
   return w - ui.pad * 2 - barW, offset
 end
@@ -477,13 +624,14 @@ function ui.endScroll(id, x, y, w, h)
   scrollOffsets[id] = offset
 
   if maxOffset > 0 then
-    local barW = 6
-    local bx = x + w - barW - 2
-    local trackH = h - 4
-    local thumbH = math.max(24, trackH * (h / contentHeight))
+    local barW = ui.unit * 2
+    local bx = x + w - barW - ui.unit
+    local trackH = h - ui.gap
+    local thumbH = math.max(ui.rowHeight, trackH * (h / contentHeight))
     local t = offset / maxOffset
-    rect("fill", bx, y + 2, barW, trackH, { 0, 0, 0, 0.35 }, 3)
-    rect("fill", bx, y + 2 + (trackH - thumbH) * t, barW, thumbH, ui.theme.dim, 3)
+    rect("fill", bx, y + ui.unit, barW, trackH, ui.tone.inert)
+    rect("fill", bx, y + ui.unit + (trackH - thumbH) * t, barW, thumbH,
+      ui.theme.fg)
   end
 end
 

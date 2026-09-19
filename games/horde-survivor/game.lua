@@ -8,6 +8,8 @@ local editor = require("framework.editor")
 local debugdraw = require("framework.debugdraw")
 local input = require("framework.input")
 local perf = require("framework.perf")
+local ui = require("framework.ui")
+local fonts = require("framework.fonts")
 
 local settings = require("settings")
 local content = require("content")
@@ -47,6 +49,75 @@ function game.setMode(next)
 end
 
 function game.mode() return mode end
+
+-- ------------------------------------------------------------- pause menu
+--
+-- Pause doubles as the level picker. It follows the framework UI contract:
+-- the background colour as the ground, white text, the accent on the current
+-- row, and every offset a multiple of ui.unit.
+local pauseIndex = 1
+
+local PAUSE_ITEMS = {
+  { label = "Resume" },
+  { label = "Play the run", target = "run" },
+  { label = "Zoo",          target = "zoo" },
+  { label = "Range",        target = "range" },
+}
+
+local function pauseActivate(item)
+  paused = false
+  -- enterMode, not setMode: picking a level from a list should go there,
+  -- not toggle back to the run when you pick the one you are already in.
+  if item.target then enterMode(item.target) end
+end
+
+local function updatePauseMenu()
+  if input.consume("menuUp") then
+    pauseIndex = (pauseIndex - 2) % #PAUSE_ITEMS + 1
+  end
+  if input.consume("menuDown") then
+    pauseIndex = pauseIndex % #PAUSE_ITEMS + 1
+  end
+  if input.consume("confirm") then pauseActivate(PAUSE_ITEMS[pauseIndex]) end
+  if input.consume("cancel") then paused = false end
+end
+
+local function drawPauseMenu(scale, ox, oy)
+  local g = love.graphics
+  local c = config.values
+  local viewW, viewH = c.render.width * scale, c.render.height * scale
+
+  g.setColor(ui.theme.background[1], ui.theme.background[2],
+    ui.theme.background[3], 0.85)
+  g.rectangle("fill", ox, oy, viewW, viewH)
+
+  local title = fonts.role("title")
+  local titleH = title:getHeight()
+  local rowStride = ui.rowHeight + ui.rowGap
+  -- Width comes from the title, or it wraps and collides with the rule.
+  local w = math.max(title:getWidth("PAUSED") + ui.sectionGap, ui.unit * 44)
+  w = math.min(w, viewW - ui.sectionGap * 2)
+  local ruleOffset = titleH + ui.gap
+  local h = ruleOffset + ui.gap + #PAUSE_ITEMS * rowStride
+  local x = ox + math.floor((viewW - w) / 2)
+  local y = oy + math.floor((viewH - h) / 2)
+
+  g.setFont(title)
+  g.setColor(ui.theme.fg)
+  g.printf("PAUSED", x, y, w, "center")
+  g.setColor(ui.theme.line)
+  g.line(x, y + ruleOffset, x + w, y + ruleOffset)
+
+  g.setFont(fonts.role("body"))
+  ui.layout(x, y + ruleOffset + ui.gap, w)
+  for i, item in ipairs(PAUSE_ITEMS) do
+    if ui.button("pause." .. i, item.label,
+        { selected = i == pauseIndex, align = "center" }) then
+      pauseIndex = i
+      pauseActivate(item)
+    end
+  end
+end
 
 
 --- True when the simulation is frozen, either by the pause key or because the
@@ -207,7 +278,16 @@ function game.update(dt)
   if not current then return end
   local c = config.values
 
-  if input.consume("pause") then paused = not paused end
+  if input.consume("pause") then
+    paused = not paused
+    if paused then pauseIndex = 1 end
+  end
+
+  -- While explicitly paused the menu owns input; the sim is frozen anyway.
+  if paused then
+    updatePauseMenu()
+    return
+  end
 
   if sandboxState then
     if input.consume("prev") then sandbox.cycle(sandboxState, -1) end
@@ -293,14 +373,18 @@ end
 function game.drawScreenOverlay(scale, ox, oy)
   if sandboxState then
     sandbox.drawOverlay(sandboxState, scale, ox, oy)
-    if game.isPaused() then hud.drawPaused(scale, ox, oy) end
+    if paused then drawPauseMenu(scale, ox, oy)
+    elseif game.isPaused() then hud.drawPaused(scale, ox, oy) end
     return
   end
   if not current then return end
   hud.draw(current, scale, ox, oy)
 
-  if game.isPaused() and current.state == runModule.STATE.PLAYING then
-    hud.drawPaused(scale, ox, oy)
+  if current.state == runModule.STATE.PLAYING then
+    -- The menu is for a deliberate pause. An editor-induced freeze just gets
+    -- the word, so the panel you are working in is not covered by a menu.
+    if paused then drawPauseMenu(scale, ox, oy)
+    elseif game.isPaused() then hud.drawPaused(scale, ox, oy) end
   end
 
   if config.values.debug.showRunState then
