@@ -152,15 +152,33 @@ content.weaponTypeFields = {
   aura = {
     { name = "radius", label = "Aura radius", type = "number", min = 8, max = 160, order = 3, unit = "px" },
   },
+  -- An MWS weapon has no flat stats: its tunables live in its module graph,
+  -- which has variable topology and so cannot be a fixed list of settings.
+  -- What is left here is only how a *level* scales that graph, which is the
+  -- same for every MWS weapon and therefore is a fixed list.
+  mws = {
+    { name = "damageMult",   label = "Damage",        type = "number", min = 0.1, max = 20, order = 1, format = "%.2f", unit = "x" },
+    { name = "fireRateMult", label = "Fire rate",     type = "number", min = 0.1, max = 20, order = 2, format = "%.2f", unit = "x" },
+    { name = "barrelBonus",  label = "Extra barrels", type = "number", min = 0,   max = 15, order = 3, format = "%.2f" },
+    { name = "pierceBonus",  label = "Extra pierce",  type = "number", min = 0,   max = 15, order = 4, format = "%.2f" },
+    { name = "energyMult",   label = "Energy supply", type = "number", min = 0.1, max = 20, order = 5, format = "%.2f", unit = "x" },
+  },
 }
 
 content.weapons = {
   {
-    id = "blaster", name = "Blaster", kind = "projectile", targeting = "nearest",
+    -- The first weapon built out of modules rather than out of a stat block.
+    -- `graph` names the built-in graph in weapongraphs.lua, which a saved
+    -- override in config/weapons/ can replace. Every number that used to be
+    -- here -- damage, cooldown, spread, pierce -- is now a module property,
+    -- edited in the bench (F7) rather than in the editor.
+    id = "blaster", name = "Blaster", kind = "mws", targeting = "nearest",
+    graph = "blaster",
     blurb = "Fires at the nearest enemy. Reliable, unexciting, always taken.",
-    tune = { damage = 7, cooldown = 0.55, speed = 190, count = 1, spread = 8,
-             pierce = 0, lifetime = 1.6, radius = 2, critChance = 0.05, knockback = 40 },
-    perLevel = { damage = 3, cooldown = -0.045, count = 0.34, pierce = 0.25 },
+    tune = { damageMult = 1, fireRateMult = 1, barrelBonus = 0,
+             pierceBonus = 0, energyMult = 1 },
+    perLevel = { damageMult = 0.43, fireRateMult = 0.12, barrelBonus = 0.34,
+                 pierceBonus = 0.25, energyMult = 0.35 },
     cost = 0, upgradeCost = 22,
   },
   {

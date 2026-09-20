@@ -40,10 +40,11 @@ tools/                 headless tests, the balance harness, the worktree helper
 | `F5` | zoo — one cage per enemy |
 | `F6` | range — one room per weapon |
 | `F7` | screenshot to `captures/` |
+| `F8` | bench — the weapon graph editor |
 | `WASD` / left stick | move |
 | `P` / `start` | pause menu, which is also the level picker |
 | `R` | restart run |
-| `,` `.` | cycle: weapon in the zoo, enemy type on the range |
+| `,` `.` | cycle: weapon in the zoo, enemy type on the range, weapon on the bench |
 | `↑` `↓` / d-pad | move through the pause menu; `space` picks |
 
 Firing is automatic. `F5` and `F6` toggle: press the same key again to go back
@@ -78,7 +79,7 @@ same command line produces a byte-identical PNG every time.
 | `--capture <path>` | where the PNG goes; a bare name lands in `captures/` |
 | `--at <seconds>` | simulated seconds to fast-forward before the shot (default 2) |
 | `--seed <n>` | pins the run and LÖVE's generator, making the shot reproducible |
-| `--mode run\|zoo\|range` | which level |
+| `--mode run\|zoo\|range\|bench` | which level |
 | `--profile <name>` | load a config profile first |
 | `--set <key>=<value>` | any schema key, repeatable |
 | `--do "<label>"` | run an editor action by its label, repeatable |
@@ -116,6 +117,71 @@ weapon and nothing else. `,` and `.` change which enemy spawns to shoot at.
 Both show the live stats for whatever room you are in, read from the config —
 so a number you change in the editor is reflected there immediately. The
 `Levels` page in the editor has the same entrances plus the room settings.
+
+## The Modular Weapon System
+
+The Blaster is not a stat block. It is a graph of modules:
+
+```
+TRIGGER -> BATTERY -> REPEATER -> BARREL -> STRIKER -> PAYLOAD
+```
+
+Firing sends **events** down that graph. Each module does one job — supply
+energy, start a strike, turn a held window into a cadence, aim and branch,
+simulate the strike, apply damage. Every weapon behaviour the system can
+express is built from those seven pieces, including ones no stat block
+reaches: a projectile that carries a repeater and sprays while it flies, or a
+payload whose hit starts a second strike where it landed.
+
+The implementation is in `shared/framework/mws/` and knows nothing about this
+game. It decides *what* should happen and hands finished strikes to a host,
+which puts them in its own world and calls back on hit and on expiry. That
+split is why the whole thing runs headless and why `luajit tools/test.lua`
+can check the rules rather than the feel.
+
+**Energy is the balancing mechanism.** Batteries supply it, triggers and
+repeaters spend it, and a strike's cost is every module below it, precomputed.
+A battery powers its whole *segment* — the stretch of graph with no branch in
+it — and divides at barrel branches, so where you place one is a real
+decision. A weapon that asks for more than its batteries supply does not
+break; it stalls, which is the mechanism working.
+
+**A graph has variable topology, so its properties cannot be schema keys.**
+That is the one legitimate exception to the schema rule, and it is handled the
+same way `content.lua` is: a module **spec** in
+`shared/framework/mws/modules.lua` declares each type and its properties, and
+the inspector, the node defaults and the graph JSON are all generated from it.
+Add a property there and it appears everywhere. There is still no second list.
+
+Built-in graphs live in `games/horde-survivor/weapongraphs.lua`. Editing one
+in the bench and saving writes `config/weapons/<id>.json`, which overrides the
+built-in until you revert — the same bargain a profile makes with the schema.
+
+## The bench
+
+`F8`. The weapon-graph editor, built as a level rather than a panel so you can
+watch the thing you are editing actually fire.
+
+The player stands in an arena across the top of the screen shooting dummies;
+the graph is a flowchart underneath. Each module is a 48px tile with an icon;
+clicking one fills the inspector on the right with its properties, drawn with
+the editor's own widgets. There is no apply step — the run is holding the same
+table the canvas is drawing, so a slider moves and the next shot is different.
+
+| | |
+|---|---|
+| drag a port | wire it to another module |
+| drag a wired port | take the wire off and re-aim it |
+| drag a tile | move it |
+| drag the canvas | pan |
+| wheel | zoom |
+| `del` | remove the selected module |
+| `,` `.` | swap which weapon you are editing |
+
+The header shows energy in and out, and says `STALLING` when the batteries
+cannot keep up. Modules that cannot work — a chain trigger with no payload
+above it, a terminal module with something wired below — are outlined in the
+warning colour, and the first problem is named in the header.
 
 ## The shop
 

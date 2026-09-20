@@ -8,6 +8,7 @@ local schema = require("framework.schema")
 local debugdraw = require("framework.debugdraw")
 local content = require("content")
 local sandbox = require("sandbox")
+local arsenal = require("arsenal")
 
 local M = {}
 
@@ -29,6 +30,11 @@ local function register(page, section, sectionOrder, settings)
 end
 
 function M.register()
+  -- Module properties before anything that lists them: the game adds crit,
+  -- knockback and pierce to the framework's modules, and a graph built before
+  -- that would have no defaults for them.
+  arsenal.registerModules()
+
   -- ------------------------------------------------------------------ Run
   register("Run", "Length", 10, {
     { key = "run.durationMinutes", label = "Run length", type = "number",
@@ -415,6 +421,7 @@ function M.register()
 
   -- ---------------------------------------------------------- the levels
   sandbox.registerSettings(schema)
+  arsenal.registerSettings(schema)
 
   -- ------------------------------------------------------------ overlays
   -- Registered as bool settings on the Overlays page, so they save into

@@ -185,8 +185,11 @@ function sim.run(suite, check, eq, near)
       end
     end
     for _, def in ipairs(content.weapons) do
-      if schema.get("weapon." .. def.id .. ".damage") == nil then
-        missing[#missing + 1] = def.id .. ".damage"
+      -- A modular weapon has no flat damage: its numbers are module
+      -- properties in its graph. What it must have is the level scaling.
+      local field = (def.kind == "mws") and "damageMult" or "damage"
+      if schema.get("weapon." .. def.id .. "." .. field) == nil then
+        missing[#missing + 1] = def.id .. "." .. field
       end
     end
     check("every content item has editor settings", #missing == 0,
@@ -336,14 +339,14 @@ function sim.run(suite, check, eq, near)
     near("enemy HP comes from the editor value", e.hp, 999, 1e-6)
     config.resetKey("enemy.grunt.hp")
     config.resetKey("scale.eliteChance")
-    config.set("weapon.blaster.damage", 50)
+    config.set("weapon.scatter.damage", 50)
     near("weapon damage comes from the editor value",
-      runModule.weaponValue("blaster", "damage", 1), 50)
-    config.set("weapon.blaster.perLevel.damage", 10)
+      runModule.weaponValue("scatter", "damage", 1), 50)
+    config.set("weapon.scatter.perLevel.damage", 10)
     near("per-level growth is applied",
-      runModule.weaponValue("blaster", "damage", 3), 70)
-    config.resetKey("weapon.blaster.damage")
-    config.resetKey("weapon.blaster.perLevel.damage")
+      runModule.weaponValue("scatter", "damage", 3), 70)
+    config.resetKey("weapon.scatter.damage")
+    config.resetKey("weapon.scatter.perLevel.damage")
 
     config.set("run.waveSeconds", 30)
     local r2 = runModule.new(3)

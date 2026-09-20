@@ -295,6 +295,17 @@ do
   check("unknown setting", capture.coerceSet(nil, "1") == nil)
 end
 
+-- ------------------------------------------------------------------- mws
+
+local mwsOk, mwsErr = pcall(function()
+  local mwssuite = require("tools.mwssuite")
+  mwssuite.run(suite, check, eq, near)
+end)
+if not mwsOk then
+  suite("mws")
+  check("mws suite loaded", false, mwsErr)
+end
+
 -- ------------------------------------------------------------- simulation
 
 local simOk, simErr = pcall(function()

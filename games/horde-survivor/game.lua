@@ -17,24 +17,31 @@ local runModule = require("run")
 local render = require("render")
 local hud = require("hud")
 local sandbox = require("sandbox")
+local bench = require("bench")
 
 local game = {}
 
 local current = nil
 local paused = false
 
--- "run" is the game. "zoo" and "range" are the inspection levels; both hold a
--- sandbox whose own run is simulated in place of the real one.
+-- "run" is the game. "zoo", "range" and "bench" are the inspection levels;
+-- each holds its own run, simulated in place of the real one. The bench is a
+-- separate module because its subject is a weapon graph rather than a grid of
+-- rooms, but it is the same idea: an ordinary run you can stand in.
 local mode = "run"
 local sandboxState = nil
+local benchState = nil
 
---- Enter a level outright. `next` is "run", "zoo" or "range".
+--- Enter a level outright. `next` is "run", "zoo", "range" or "bench".
 local function enterMode(next)
   mode = next
   render.underlay = nil
+  sandboxState, benchState = nil, nil
   if next == "run" then
-    sandboxState = nil
     if current then render.snapCamera(current) end
+  elseif next == "bench" then
+    benchState = bench.new()
+    render.snapCamera(benchState.run)
   else
     sandboxState = sandbox.new(next)
     render.snapCamera(sandboxState.run)
@@ -62,6 +69,7 @@ local PAUSE_ITEMS = {
   { label = "Play the run", target = "run" },
   { label = "Zoo",          target = "zoo" },
   { label = "Range",        target = "range" },
+  { label = "Bench",        target = "bench" },
 }
 
 local function pauseActivate(item)
@@ -223,6 +231,9 @@ local function registerDebugActions()
   editor.action{ page = "Levels", section = "Go to", order = 3,
     label = "Range (F6)",
     fn = function() game.setMode("range") end }
+  editor.action{ page = "Levels", section = "Go to", order = 4,
+    label = "Bench (F7)",
+    fn = function() game.setMode("bench") end }
 
   editor.action{ page = "Overlays", section = "All", order = 1,
     label = "Turn every overlay on",
@@ -289,6 +300,19 @@ function game.update(dt)
   -- While explicitly paused the menu owns input; the sim is frozen anyway.
   if paused then
     updatePauseMenu()
+    return
+  end
+
+  if benchState then
+    if input.consume("prev") then bench.cycle(benchState, -1) end
+    if input.consume("next") then bench.cycle(benchState, 1) end
+    if input.consume("restart") then enterMode("bench") end
+    if not game.isPaused() then
+      local mx, my = input.move()
+      bench.update(benchState, dt * c.debug.timeScale, mx, my)
+    end
+    perf.count("enemies", #benchState.run.enemies)
+    perf.count("strikes", #benchState.run.strikes)
     return
   end
 
@@ -363,6 +387,12 @@ end
 -- -------------------------------------------------------------------- draw
 
 function game.draw()
+  if benchState then
+    render.underlay = function() bench.draw(benchState) end
+    render.draw(benchState.run)
+    render.underlay = nil
+    return
+  end
   if sandboxState then
     render.underlay = function() sandbox.draw(sandboxState) end
     render.draw(sandboxState.run)
@@ -374,6 +404,12 @@ function game.draw()
 end
 
 function game.drawScreenOverlay(scale, ox, oy)
+  if benchState then
+    bench.drawOverlay(benchState, scale, ox, oy)
+    if paused then drawPauseMenu(scale, ox, oy)
+    elseif game.isPaused() then hud.drawPaused(scale, ox, oy) end
+    return
+  end
   if sandboxState then
     sandbox.drawOverlay(sandboxState, scale, ox, oy)
     if paused then drawPauseMenu(scale, ox, oy)
@@ -430,7 +466,7 @@ local function moveShopCursor(r, dx, dy)
 end
 
 function game.keypressed(key)
-  if sandboxState then return end
+  if sandboxState or benchState then return end
   if not current then return end
 
   if current.state == runModule.STATE.SHOP then

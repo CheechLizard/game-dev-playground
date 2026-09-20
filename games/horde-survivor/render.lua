@@ -351,6 +351,78 @@ function render.draw(r)
     dd.circle("colliders", pr.x, pr.y, pr.radius)
   end
 
+  -- MWS strikes. The shape comes from the striker's `visual` property, so a
+  -- module graph looks like what it says it is without anything here holding
+  -- a list of weapons. Drawn from primitives, like all the other art.
+  for _, st in ipairs(r.strikes or {}) do
+    local sz = st.state.collisionSize
+    local kind = st.state.visual
+    g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
+    if kind == "bolt" then
+      local lx, ly = st.dirX * sz * 2.5, st.dirY * sz * 2.5
+      g.setLineWidth(math.max(1, sz * 0.8))
+      g.line(st.x - lx, st.y - ly, st.x + lx, st.y + ly)
+      g.setLineWidth(1)
+    elseif kind == "blade" then
+      local px, py = -st.dirY * sz, st.dirX * sz
+      g.polygon("fill", st.x + st.dirX * sz * 2, st.y + st.dirY * sz * 2,
+        st.x + px, st.y + py, st.x - px, st.y - py)
+    elseif kind == "orb" then
+      g.circle("line", st.x, st.y, sz + 1)
+      g.circle("fill", st.x, st.y, sz * 0.45)
+    elseif kind == "field" then
+      g.setColor(playerCol[1], playerCol[2], playerCol[3], 0.30)
+      g.circle("fill", st.x, st.y, sz)
+      g.setColor(playerCol[1], playerCol[2], playerCol[3], 0.85)
+      g.circle("line", st.x, st.y, sz)
+    elseif kind == "spark" then
+      g.rectangle("fill", st.x - sz, st.y - 0.5, sz * 2, 1)
+      g.rectangle("fill", st.x - 0.5, st.y - sz, 1, sz * 2)
+    else
+      g.circle("fill", st.x, st.y, sz)
+    end
+    dd.circle("colliders", st.x, st.y, sz)
+  end
+
+  -- Payload effects: a shape that grows and fades over its short life. One
+  -- routine, switched on the effect name, rather than an effect system --
+  -- there is nothing here a particle engine would earn its keep on.
+  for _, fx in ipairs(r.effects or {}) do
+    local t = fx.age / fx.life
+    local fade = 1 - t
+    local accentCol = palette("accent")
+    g.setColor(accentCol[1], accentCol[2], accentCol[3], fade)
+    if fx.name == "burst" then
+      g.circle("line", fx.x, fx.y, 2 + t * fx.radius)
+    elseif fx.name == "shock" then
+      for i = 0, 5 do
+        local a = i * (math.pi / 3) + t * 2
+        local d = 2 + t * fx.radius
+        g.line(fx.x + math.cos(a) * 2, fx.y + math.sin(a) * 2,
+               fx.x + math.cos(a) * d, fx.y + math.sin(a) * d)
+      end
+    elseif fx.name == "ring" then
+      g.circle("line", fx.x, fx.y, fx.radius * (0.4 + t * 0.6))
+    elseif fx.name == "shatter" then
+      for i = 0, 3 do
+        local a = i * (math.pi / 2) + 0.4
+        local d = t * fx.radius
+        g.rectangle("fill", fx.x + math.cos(a) * d - 1,
+          fx.y + math.sin(a) * d - 1, 2, 2)
+      end
+    else
+      g.rectangle("fill", fx.x - 1, fx.y - 1, 2 + t * 2, 2 + t * 2)
+    end
+  end
+
+  for _, pt in ipairs(r.particles or {}) do
+    local fade = 1 - pt.age / pt.life
+    local accentCol = palette("accent")
+    g.setColor(accentCol[1], accentCol[2], accentCol[3], fade)
+    g.rectangle("fill", pt.x - 0.5, pt.y - 0.5, 1, 1)
+  end
+  g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
+
   -- Orbit blades and aura rings.
   for _, w in ipairs(r.player.weapons) do
     if w.def.kind == "orbit" and w.blades then

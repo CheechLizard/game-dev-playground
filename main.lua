@@ -162,6 +162,7 @@ function love.keypressed(key, scancode, isrepeat)
     editor.notify("Screenshot: " .. capture.shot())
     return
   end
+  if key == "f8" and game.setMode then game.setMode("bench") return end
 
   ui.keypressed(key)
   if ui.capturingKeyboard() then return end

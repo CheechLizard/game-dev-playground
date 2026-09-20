@@ -7,6 +7,7 @@
 
 local config = require("framework.config")
 local content = require("content")
+local arsenal = require("arsenal")
 
 local run = {}
 run.__index = run
@@ -68,6 +69,13 @@ end
 function run.new(seed)
   local self = setmetatable({}, run)
   self.rng = makeRng(seed or os.time())
+  -- A second stream, for weapon jitter and anything else cosmetic. Spread,
+  -- speed variance and particle scatter pull from here rather than from the
+  -- run's own generator, so retuning a weapon does not reshuffle every spawn,
+  -- drop and shop roll in the run. Without it, two balance runs on the same
+  -- seed stop being comparable the moment a weapon changes -- which is
+  -- exactly when you most want to compare them.
+  self.fxRng = makeRng((seed or os.time()) * 7919 + 13)
   self.seed = seed
   self:reset()
   return self
@@ -116,6 +124,12 @@ function run:reset()
   self.enemies = {}
   self.pendingSpawns = {}
   self.projectiles = {}
+  -- MWS strikes are their own list rather than sharing `projectiles`: a strike
+  -- carries a whole graph context, and the two kinds of weapon should not have
+  -- to pretend to be one kind of thing while both exist.
+  self.strikes = {}
+  self.effects = {}
+  self.particles = {}
   self.enemyShots = {}
   self.pickups = {}
 
@@ -191,9 +205,21 @@ function run:addWeapon(id)
     slot = #self.player.weapons + 1,
   }
   self.player.weapons[#self.player.weapons + 1] = weapon
+  if def.kind == "mws" then self:buildWeaponGraph(weapon) end
   self.stats.byWeapon[id] = self.stats.byWeapon[id]
     or { damage = 0, kills = 0, hits = 0, level = 1, name = def.name }
   return weapon
+end
+
+--- Give a weapon its live graph. Separate from addWeapon so the bench can
+-- re-arm a weapon after swapping the graph under it.
+function run:buildWeaponGraph(weapon, g)
+  g = g or arsenal.load(weapon.def.graph or weapon.id)
+  if not g then return nil end
+  if weapon.mws then weapon.mws:clear() end
+  weapon.graph = g
+  weapon.mws = arsenal.instance(self, weapon, g)
+  return g
 end
 
 function run:upgradeWeapon(id)
@@ -203,6 +229,10 @@ function run:upgradeWeapon(id)
       if w.level >= max then return false, "at max level" end
       w.level = w.level + 1
       self.stats.byWeapon[id].level = w.level
+      -- Energy cost and rail are precomputed, so a level that changes fire
+      -- rate or barrel count has to invalidate them or the weapon runs on
+      -- last level's budget.
+      if w.mws then w.mws:rebuild() end
       return true
     end
   end
@@ -569,11 +599,16 @@ end
 
 -- ----------------------------------------------------------------- damage
 
-function run:damageEnemy(enemy, amount, weaponId, kx, ky)
+--- `critOverride` is how an MWS weapon passes the crit chance off its own
+-- PAYLOAD. Flat-stat weapons have one crit chance per weapon and read it from
+-- config; a graph can have a different one per payload.
+function run:damageEnemy(enemy, amount, weaponId, kx, ky, critOverride)
   if enemy.dead then return end
   local crit = false
   if weaponId then
-    local chance = (run.weaponValue(weaponId, "critChance", self:weaponLevel(weaponId)) or 0)
+    local chance = (critOverride
+        or run.weaponValue(weaponId, "critChance", self:weaponLevel(weaponId))
+        or 0)
       + self:playerStat("critChance")
     if self.rng.next() < chance then
       crit = true
@@ -1037,7 +1072,14 @@ end
 function run:updateWeapons(dt)
   local attackSpeed = self:playerStat("attackSpeedMult")
   for _, weapon in ipairs(self.player.weapons) do
-    if weapon.def.kind == "orbit" then
+    if weapon.mws then
+      -- Holding fire with nothing to shoot at drains the battery for nothing,
+      -- because a paid-for strike is paid for whether or not it finds a
+      -- target. Releasing when the arena empties is the honest version of the
+      -- old system's "retry soon if nothing was in range".
+      weapon.mws:setFiring(#self.enemies > 0)
+      weapon.mws:update(dt)
+    elseif weapon.def.kind == "orbit" then
       self:updateOrbit(weapon, dt)
     else
       weapon.timer = weapon.timer - dt
@@ -1082,6 +1124,208 @@ function run:updateProjectiles(dt)
     end
   end
   self.projectiles = alive
+end
+
+-- ------------------------------------------------------------- MWS strikes
+--
+-- The runtime decides what a strike *is*; this decides where it goes and what
+-- it touches. The two talk through four calls -- addStrike, hit, expire and
+-- applyPayload -- and share nothing else.
+
+--- Where a strike's parent is. Weapon-domain strikes orbit the player;
+-- inflight ones carry their own position.
+function run:strikeParent(s)
+  local ctx = s.ctx
+  if ctx and ctx.parent then return ctx.parent.x, ctx.parent.y end
+  return self.player.x, self.player.y
+end
+
+--- A STRIKER has fired. Turn the strike state into something with a velocity.
+function run:addStrike(strike, weapon)
+  local st = strike.state
+  strike.weapon = weapon
+  strike.weaponId = weapon.id
+  strike.hitTimes = {}
+  strike.pierce = math.max(0, math.floor((st.extra.pierce or 0) + 0.5))
+  strike.dirX, strike.dirY = st.strikeAimX, st.strikeAimY
+  strike.speed = (st.baseSpeed or 0) * (st.speedMultiplier or 1)
+  strike.angle = math.atan2(strike.dirY, strike.dirX)
+  strike.baseX, strike.baseY = strike.x, strike.y
+  strike.dist = 0
+  strike.fallV = 0
+  self.strikes[#self.strikes + 1] = strike
+end
+
+local TWO_PI = math.pi * 2
+
+function run:moveStrike(s, dt)
+  local st = s.state
+
+  if st.motionType == "orbit" then
+    -- An orbiting strike never leaves its parent, so it has no heading of its
+    -- own and no distance travelled to run out of.
+    local px, py = self:strikeParent(s)
+    s.angle = s.angle + math.rad(st.orbitSpeed or 0) * dt
+    s.x = px + math.cos(s.angle) * (st.orbitRadius or 0)
+    s.y = py + math.sin(s.angle) * (st.orbitRadius or 0)
+    return
+  end
+
+  s.speed = s.speed + (st.acceleration or 0) * dt
+  local vx = s.dirX * s.speed
+  local vy = s.dirY * s.speed
+  if st.motionType == "gravity" then
+    s.fallV = s.fallV + (st.gravity or 0) * dt
+    vy = vy + s.fallV
+  end
+
+  local stepX, stepY = vx * dt, vy * dt
+  s.baseX = s.baseX + stepX
+  s.baseY = s.baseY + stepY
+  s.dist = s.dist + math.sqrt(stepX * stepX + stepY * stepY)
+
+  if st.motionType == "sine" and (st.waveAmplitude or 0) > 0 then
+    -- Weave across the heading rather than around it, so the strike still
+    -- arrives where it was aimed.
+    local offset = math.sin(s.age * (st.waveFrequency or 0) * TWO_PI)
+      * st.waveAmplitude
+    s.x = s.baseX + (-s.dirY) * offset
+    s.y = s.baseY + (s.dirX) * offset
+  else
+    s.x, s.y = s.baseX, s.baseY
+  end
+end
+
+function run:collideStrike(s, dt)
+  local st = s.state
+  local retrigger = (st.triggerBehavior == "retriggerable")
+  local interval = st.extra.retriggerInterval or 0.35
+  local reachBase = st.collisionSize or 1
+
+  for _, e in ipairs(self.enemies) do
+    if not e.dead and s.alive then
+      local dx, dy = e.x - s.x, e.y - s.y
+      local reach = e.radius + reachBase
+      if dx * dx + dy * dy < reach * reach then
+        local last = s.hitTimes[e]
+        local mayHit = retrigger and (not last or self.time - last >= interval)
+          or (not retrigger and not last)
+        if mayHit then
+          s.hitTimes[e] = self.time
+          self:strikeHit(s, e)
+        end
+      end
+    end
+  end
+end
+
+--- One body struck. Direct damage is applied here, exactly as the
+-- specification has the collision system read `damage` straight off the
+-- projectile; the graph is only told afterwards, so it can splash and chain.
+function run:strikeHit(s, e)
+  local st = s.state
+  local knockback = st.extra.knockback or 0
+  local hx, hy = e.x, e.y
+  self:damageEnemy(e, st.baseDamage, s.weaponId,
+    s.dirX * knockback, s.dirY * knockback, st.extra.critChance)
+
+  local survives = (st.triggerBehavior == "retriggerable") or s.pierce > 0
+  if s.pierce > 0 and st.triggerBehavior ~= "retriggerable" then
+    s.pierce = s.pierce - 1
+  end
+  s.runtime:hit(s, hx, hy, e, survives)
+end
+
+--- A PAYLOAD fired. Splash only: the body that was struck has already been
+-- damaged by the collision that caused the Hit, and paying it twice would
+-- make every splash weapon secretly double-hit its target.
+function run:applyPayload(weapon, node, event, wasHit)
+  local radius = weapon.mws and weapon.mws:prop(node, "damageRadius") or 0
+  if radius <= 0 then return end
+  local power = weapon.mws:prop(node, "damagePower") or 0
+  local crit = weapon.mws:prop(node, "critChance")
+  local r2 = radius * radius
+  for _, e in ipairs(self.enemies) do
+    if not e.dead and e ~= event.target then
+      local dx, dy = e.x - event.x, e.y - event.y
+      if dx * dx + dy * dy < r2 then
+        self:damageEnemy(e, power, weapon.id, 0, 0, crit)
+      end
+    end
+  end
+end
+
+-- Effects and emissions are cosmetic, and the simulation has to keep running
+-- headless, so they are plain data with a hard cap rather than anything that
+-- knows about drawing.
+local MAX_EFFECTS, MAX_PARTICLES = 80, 400
+
+function run:addEffect(name, x, y, node)
+  if #self.effects >= MAX_EFFECTS then table.remove(self.effects, 1) end
+  local radius = 6
+  if node and node.props then radius = math.max(6, node.props.damageRadius or 6) end
+  self.effects[#self.effects + 1] = {
+    name = name, x = x, y = y, age = 0, life = 0.3, radius = radius,
+  }
+end
+
+function run:addEmission(node, x, y, state, weapon)
+  local props = node.props
+  local count = math.min(props.count or 1, MAX_PARTICLES - #self.particles)
+  local spread = math.rad(props.spread or 0)
+  local base = math.atan2(state.strikeAimY or 0, state.strikeAimX or 1)
+  for _ = 1, math.max(0, count) do
+    local a = base + (self.fxRng.next() - 0.5) * spread
+    local speed = (props.speed or 0) * (0.6 + self.fxRng.next() * 0.8)
+    self.particles[#self.particles + 1] = {
+      x = x, y = y,
+      vx = math.cos(a) * speed, vy = math.sin(a) * speed,
+      age = 0, life = props.lifetime or 0.5, kind = props.effect or "spark",
+    }
+  end
+end
+
+function run:updateStrikes(dt)
+  local alive = {}
+  for _, s in ipairs(self.strikes) do
+    if s.alive then
+      s.age = s.age + dt
+      self:moveStrike(s, dt)
+      self:collideStrike(s, dt)
+    end
+    if s.alive then
+      local st = s.state
+      local spent = s.age >= (st.lifetimeMax or math.huge)
+        or s.dist >= (st.rangeMax or math.huge)
+        or s.x < -60 or s.x > self.arenaW + 60
+        or s.y < -60 or s.y > self.arenaH + 60
+      -- expire() runs the graph: Stop first so repeaters below close, then
+      -- Miss so the payload fires where the strike died.
+      if spent then s.runtime:expire(s, s.x, s.y) end
+    end
+    if s.alive then alive[#alive + 1] = s end
+  end
+  self.strikes = alive
+end
+
+function run:updateEffects(dt)
+  local kept = {}
+  for _, fx in ipairs(self.effects) do
+    fx.age = fx.age + dt
+    if fx.age < fx.life then kept[#kept + 1] = fx end
+  end
+  self.effects = kept
+
+  local live = {}
+  for _, pt in ipairs(self.particles) do
+    pt.age = pt.age + dt
+    pt.x = pt.x + pt.vx * dt
+    pt.y = pt.y + pt.vy * dt
+    pt.vx = pt.vx * (1 - math.min(1, 2.4 * dt))
+    pt.vy = pt.vy * (1 - math.min(1, 2.4 * dt))
+    if pt.age < pt.life then live[#live + 1] = pt end
+  end
+  self.particles = live
 end
 
 -- ------------------------------------------------------------------ player
@@ -1146,6 +1390,8 @@ function run:update(dt, moveX, moveY)
   self:separateEnemies(dt)
   self:updateWeapons(dt)
   self:updateProjectiles(dt)
+  self:updateStrikes(dt)
+  self:updateEffects(dt)
   self:updateEnemyShots(dt)
   self:updatePickups(dt)
 

@@ -714,4 +714,23 @@ function ui.resetScroll(id) scrollOffsets[id] = 0 end
 function ui.mouseInside(x, y, w, h) return inside(x, y, w, h) end
 function ui.mousePos() return mouse.x, mouse.y end
 
+-- Raw mouse state, for surfaces that are not a stack of rows: the node canvas
+-- drags boxes and pulls wires, which no widget here can express. Everything
+-- built out of rows should keep using the widgets rather than these.
+function ui.mouseDown() return mouse.down end
+function ui.mouseClicked() return clicked() end
+function ui.mouseReleased() return released() end
+function ui.wheel() return mouse.wheel end
+function ui.takeWheel()
+  local w = mouse.wheel
+  mouse.wheel = 0
+  return w
+end
+
+--- Keys pressed this frame that no text field has claimed.
+function ui.keysPressed()
+  if keyboardFocus then return {} end
+  return pendingKeys
+end
+
 return ui

@@ -37,7 +37,7 @@ capture.status = nil        -- last human-readable result
 
 -- --------------------------------------------------------------- parsing
 
-local MODES = { run = true, zoo = true, range = true }
+local MODES = { run = true, zoo = true, range = true, bench = true }
 
 local function needsValue(flag, value)
   if value == nil or value:sub(1, 2) == "--" then

@@ -179,6 +179,9 @@ function sandbox.update(s, dt, moveX, moveY)
     r.pendingSpawns = {}
     r.enemyShots = {}
     r.projectiles = {}
+    r.strikes = {}
+    r.effects = {}
+    r.particles = {}
     r.pickups = {}
     if s.mode == "range" then r.player.weapons = {} end
   end
