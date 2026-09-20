@@ -126,6 +126,7 @@ function love.keypressed(key, scancode, isrepeat)
   if key == "f4" then debugdraw.master = not debugdraw.master return end
   if key == "f5" and game.setMode then game.setMode("zoo") return end
   if key == "f6" and game.setMode then game.setMode("range") return end
+  if key == "f8" and game.setMode then game.setMode("bench") return end
 
   ui.keypressed(key)
   if ui.capturingKeyboard() then return end

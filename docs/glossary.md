@@ -63,6 +63,39 @@ retired, update it here too.
 | **Underlay** | An optional world-space layer drawn between the background and the entities. The sandbox rooms use it. | `render.underlay` |
 | **Seeded rng** | The run's own generator, so a given seed reproduces a run exactly in both tests and the game. Deliberately not `math.random`. | `makeRng` in `run.lua` |
 
+## Modular Weapon System
+
+Implements `docs/entities/Modular_Weapon_System.md` from the ShmupRouge
+project. Where this implementation departs from that specification, the term
+says so.
+
+| Term | Meaning | Code |
+|---|---|---|
+| **MWS** | The Modular Weapon System: a weapon is a directed graph of modules rather than a stat block. Framework-level and game-agnostic — it decides *what* should happen and hands finished strikes to a host game to simulate. | `shared/framework/mws/` |
+| **Module** | One node. Seven types, each doing one job: BATTERY supplies energy, TRIGGER starts strikes, REPEATER turns a window into a cadence, BARREL aims and branches, STRIKER simulates the strike, PAYLOAD applies damage and effects, EMITTER throws untracked particles. | `mws.modules.types` |
+| **Module spec** | The declaration of a module type and its properties. Plays the part the schema plays for settings: the inspector, the node defaults and the graph JSON are all generated from it. A graph has variable topology, so its properties *cannot* be schema keys — this is the one place settings legitimately live outside the schema. | `shared/framework/mws/modules.lua` |
+| **Graph** | A forest of single-input nodes. Every module takes events from exactly one upstream connection; BARREL alone has more than one downstream port. Unique parentage is what makes "which projectile am I attached to" have one answer. | `shared/framework/mws/graph.lua` |
+| **Port** | One downstream connection on a node. The canvas always shows one more than are wired, so there is somewhere to drag a new branch from. | `node.outputs`, `visiblePorts` |
+| **Event** | What flows through the graph: `start`, `stop`, `hit`, `miss`. A module forwards, modifies, consumes, or emits them. | `dispatch` in `runtime.lua` |
+| **Strike state** | The data a Start carries — trajectory, motion, damage, lifetime. Created fresh by TRIGGER, cloned at every BARREL branch, read by the host when it builds the strike. Configuration, not live simulation data. | `runtime.newState` |
+| **Strike** | One live instance in the world. The runtime creates it and the host game moves it and collides it; the host calls back with `hit` and `expire`. | `run.strikes`, `run:updateStrikes` |
+| **Domain** | Which parent supplies position to a context: `weapon` (the wielder), `inflight` (a detached projectile), `post` (an impact point). | `info.domain` |
+| **Context** | A domain plus its parent. A STRIKER launching a detaching strike opens a child context parented to the strike, so a REPEATER below it fires from the moving projectile without knowing that is what it is doing. Recursion falls out of this. | `newContext` in `runtime.lua` |
+| **Subgraph** | What hangs below a STRIKER: the strike's own modules, updated with the strike as parent. | `strike.subCtx` |
+| **Segment** | A stretch of graph with no branch in it, and the unit energy is measured over. A battery powers its whole segment — above it as well as below — because every example in the specification wires TRIGGER → BATTERY. What a battery cannot cross is a branch. | `segment` in `graph.lua` |
+| **Rail** | The energy per second reaching a node: the batteries on its segment, plus what it inherited, divided at every barrel branch above it. | `info.rail` |
+| **Strike cost** | What one strike started at a node costs: every module below it, precomputed. A BARREL routing `all` pays for every barrel; `round_robin` pays for the average one, because one event only takes one of them. | `strikeCost`, `mws.cost.<type>` |
+| **Stall** | A trigger or repeater wanting to fire and not being able to pay. The balancing mechanism working, not a fault. | `runtime.stalled` |
+| **Routing** | How a BARREL distributes one event: `round_robin` fires one barrel and advances, `all` fires every barrel at once. An extension — the specification says round-robin only, which cannot express a shotgun. | `barrel.routing` |
+| **Aim mode** | Where a BARREL's heading comes from — `nearest`, `heading`, `random`, `fixed`. An extension: the specification assumes a player aiming a shmup, and this game's weapons fire themselves. | `barrel.aimMode` |
+| **Chain trigger** | A TRIGGER with an `on_hit`, `on_miss`, `on_start` or `on_stop` condition, which starts a follow-up strike where the last one landed. It reacts only to a Start the PAYLOAD raised — a STRIKER also sends Start down its subgraph at launch, and reacting to that detonates a cluster bomb in the barrel. | `event.fromPayload` |
+| **Weapon graph** | One saved weapon. The built-in is Lua; an edited one is written to `config/weapons/<id>.json` and overrides it, the same bargain a profile makes with the schema. Revert throws the override away. | `games/horde-survivor/weapongraphs.lua`, `arsenal.load` |
+| **Arsenal** | The game's side of MWS: the extra module properties this game needs (crit, knockback, pierce), graph loading and saving, and the host adapter. The seam between the specification and the game. | `games/horde-survivor/arsenal.lua` |
+| **Host** | What the runtime calls into: `wielder`, `aim`, `spawn`, `payload`, `effect`, `emit`. The whole contract between a graph and a game. | `arsenal.host` |
+| **Modifier** | The hook through which weapon level and player bonuses reach a graph, read per property. The graph itself is never rewritten, so the bench edits the same table the run is firing. | `arsenal.modifier`, `runtime:prop` |
+| **Bench** | The inspection level for weapon graphs. `F8`. The player fires in an arena across the top; the graph is a flowchart underneath, edited live. | `games/horde-survivor/bench.lua` |
+| **Tile** | One module on the canvas: 48px, an icon and a three-letter tag. Its numbers are in the inspector, because a module's properties on its box make a six-module weapon wider than any panel it must fit in. | `flowchart.NODE` |
+
 ## Tooling
 
 | Term | Meaning | Code |

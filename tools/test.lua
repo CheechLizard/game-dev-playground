@@ -220,6 +220,17 @@ do
   os.execute('rm -rf "' .. profiles.dir .. '"')
 end
 
+-- ------------------------------------------------------------------- mws
+
+local mwsOk, mwsErr = pcall(function()
+  local mwssuite = require("tools.mwssuite")
+  mwssuite.run(suite, check, eq, near)
+end)
+if not mwsOk then
+  suite("mws")
+  check("mws suite loaded", false, mwsErr)
+end
+
 -- ------------------------------------------------------------- simulation
 
 local simOk, simErr = pcall(function()
