@@ -54,14 +54,18 @@ end
 --- Register a named hook the editor can call, e.g. "restartRun".
 function editor.hook(name, fn) editor.hooks[name] = fn end
 
-local function notify(text)
+--- Show a line in the editor's footer for a few seconds. Public because the
+-- launcher reports screenshots through it.
+function editor.notify(text)
   editor.message = text
   editor.messageUntil = (love and love.timer and love.timer.getTime() or 0) + 4
 end
 
--- Pages come from the schema, plus any page that only carries actions, plus
+local notify = editor.notify
+
+--- Pages come from the schema, plus any page that only carries actions, plus
 -- the built-in Profiles page. Computed fresh so a hot reload is reflected.
-local function pageNames()
+function editor.pageNames()
   local names, seen = {}, {}
   for _, page in ipairs(schema.pages) do
     names[#names + 1] = page.name
@@ -80,7 +84,7 @@ end
 function editor.toggle()
   editor.open = not editor.open
   if editor.open and not editor.page then
-    editor.page = pageNames()[1]
+    editor.page = editor.pageNames()[1]
   end
 end
 
@@ -379,7 +383,7 @@ function editor.draw()
   end
 
   -- ---- sidebar
-  local names = pageNames()
+  local names = editor.pageNames()
   ui.layout(6, headerH + 6, sidebar - 12)
   for _, name in ipairs(names) do
     if ui.button("page." .. name, name, { selected = (name == editor.page) }) then

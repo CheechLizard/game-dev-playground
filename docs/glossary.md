@@ -26,6 +26,9 @@ retired, update it here too.
 | **Action** | A named input intent (rather than a raw key or button), so keyboard and gamepad feed one path. Consumed once per frame. | `input.press`, `input.consume` |
 | **Letterbox** | The integer-scaled centring of the fixed-size render canvas within the window. Integer-only: a fractional scale makes pixel art shimmer. | `recomputeLetterbox` in `main.lua` |
 | **Canvas** | The fixed-size offscreen render target sized by `render.width`/`render.height`, drawn letterboxed into the window. | `rebuildCanvas` in `main.lua` |
+| **Capture** | A screenshot taken without a human at the keyboard: the launcher drives the game from the command line, draws one frame, writes a PNG and quits. The only way to see a drawn surface from a worktree with no screen. | `shared/framework/capture.lua`, `--capture`, `tools/capture.sh`, `F7` |
+| **Warm-up** | The fixed 1/60 steps a capture fast-forwards the simulation through before it shoots, named by `--at`. Fixed-step and the only time that passes during a capture, which is what makes the same command line produce the same PNG. | `capture.advance`, `--at` |
+| **Settle frames** | The few frames a capture draws and discards before shooting, so the window and the GL context are real by the time it matters. The simulation is frozen through them. | `SETTLE_FRAMES`, `capture.frozen` |
 | **Role** | What calling code asks fonts for — `title`, `heading`, `body`, `small` — rather than naming a family and size. One setting then resizes every surface at once. | `fonts.role`, `shared/framework/fonts.lua` |
 | **Family** | One pixel font file plus the design size its glyphs were drawn at. Requested sizes snap to a multiple of that step, or the stems break up. | `fonts.families`, `step` |
 | **Launcher** | `main.lua`. Owns boot order: schema → `config.build` → `profiles.init` → game. | `main.lua`, `love.load` |
@@ -80,4 +83,4 @@ retired, update it here too.
 |---|---|---|
 | **Integration branch** | `main`. The stable base every worktree branches from and every change merges back into. | — |
 | **Worktree** | An additional checkout for parallel work, created as a *sibling* of the repo — never inside it, since `love .` treats the whole directory tree as the game source. | `tools/worktree.sh` |
-| **Save identity** | The LÖVE save-directory name. Derived from the checkout's directory name rather than fixed, so parallel worktrees do not share one screenshot folder and overwrite each other's captures. | `conf.lua`, `t.identity` |
+| **Save identity** | The LÖVE save-directory name. Derived from the checkout's directory name rather than fixed, so parallel worktrees do not share one screenshot folder and overwrite each other's captures. Captures normally land in the checkout instead; this is the fallback when that write fails. | `conf.lua`, `t.identity`, `fs.write` |

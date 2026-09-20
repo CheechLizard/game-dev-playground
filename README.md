@@ -9,6 +9,7 @@ love .                      # run the default game
 love . --game horde-survivor
 luajit tools/test.lua       # headless tests (no LÖVE needed)
 luajit tools/balance.lua --runs 5
+tools/capture.sh hud.png    # screenshot, no hands on the keyboard
 ```
 
 Run from the repo root. That matters: config profiles are written back into
@@ -38,6 +39,7 @@ tools/                 headless tests, the balance harness, the worktree helper
 | `F4` | master switch for all debug overlays |
 | `F5` | zoo — one cage per enemy |
 | `F6` | range — one room per weapon |
+| `F7` | screenshot to `captures/` |
 | `WASD` / left stick | move |
 | `P` / `start` | pause menu, which is also the level picker |
 | `R` | restart run |
@@ -49,6 +51,55 @@ to the run.
 
 No screen prints its own controls. The play surface stays clear, so the keys
 live here rather than on top of the game.
+
+## Screenshots
+
+Nothing here is loaded from an image file; every pixel is drawn, and every
+editor surface is generated from the schema. So "does this look right?" can
+only be answered by looking — which is a problem for anyone working without a
+screen in front of the game. `--capture` is the answer: it drives the game from
+the command line and writes a PNG.
+
+```
+tools/capture.sh hud.png --at 8 --seed 7
+tools/capture.sh editor.png --editor Debug
+tools/capture.sh zoo.png --mode zoo --press next --press next
+tools/capture.sh shop.png --do "+100 gold" --do "Open shop"
+```
+
+The run settles for a few frames so the window is real, fast-forwards the
+simulation in fixed 1/60 steps, applies what the flags asked for, draws one
+frame, writes the PNG and quits — under a second, even for a long warm-up.
+Nothing else moves: the simulation is frozen except for the warm-up, so the
+same command line produces a byte-identical PNG every time.
+
+| Flag | |
+|---|---|
+| `--capture <path>` | where the PNG goes; a bare name lands in `captures/` |
+| `--at <seconds>` | simulated seconds to fast-forward before the shot (default 2) |
+| `--seed <n>` | pins the run and LÖVE's generator, making the shot reproducible |
+| `--mode run\|zoo\|range` | which level |
+| `--profile <name>` | load a config profile first |
+| `--set <key>=<value>` | any schema key, repeatable |
+| `--do "<label>"` | run an editor action by its label, repeatable |
+| `--press <action>` | feed an input action — `pause`, `next`, `confirm`… — repeatable |
+| `--editor [page]` | open the editor, optionally on a named page |
+| `--overlays` / `--perf` | every debug overlay on / the perf panel on |
+| `--hold` | leave the window open after the shot (for `love .` by hand) |
+
+The flags deliberately bottom out in things that already exist — `--set` takes
+any schema key, `--do` any registered editor action, `--press` any input
+action — so there is no list of capturable states to keep in sync. A new
+surface becomes capturable by being reachable through one of those, which in
+practice means giving it an editor action.
+
+A capture run writes nothing but its PNG: autosave is switched off, so `--set`
+cannot dirty the active profile. `captures/` is git-ignored. If the draw path
+errors, the error and its traceback go to stderr and the process exits
+non-zero, rather than sitting on LÖVE's error screen until something kills it.
+
+`F7` takes the same screenshot while playing, named by timestamp. It prints the
+path; there is no on-screen confirmation, because the play surface stays clear.
 
 ## The zoo and the range
 

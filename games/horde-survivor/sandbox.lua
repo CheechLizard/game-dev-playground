@@ -87,7 +87,12 @@ function sandbox.new(mode)
   local entries = (mode == "range") and content.weapons or content.enemies
   local rooms, arenaW, arenaH = buildRooms(entries)
 
-  local r = runModule.new(os.time())
+  -- Draw the sandbox's seed from LÖVE's generator rather than the clock, so
+  -- that seeding that generator -- which a screenshot capture does -- makes
+  -- the zoo and the range reproducible too. os.time is the headless fallback.
+  local seed = (love and love.math and love.math.random(1, 2147483646))
+    or os.time()
+  local r = runModule.new(seed)
   r.sandbox = true
   r.arenaW, r.arenaH = arenaW, arenaH
   -- Start in the corridor above the first room, so nothing is live on entry.

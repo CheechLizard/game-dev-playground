@@ -26,8 +26,9 @@ is the main merge-conflict hotspot when branches run in parallel.
 
 ```bash
 love .                       # run — from the repo root, never a subdirectory
-luajit tools/test.lua        # 98 tests, ~5s
+luajit tools/test.lua        # 132 tests, ~5s
 luajit tools/balance.lua --runs 6
+tools/capture.sh hud.png --at 8 --seed 7    # screenshot, ~1s
 ```
 
 **`love .` only works from the repo root.** `love games/horde-survivor` fails:
@@ -47,7 +48,27 @@ changed the balance.
 ## Keys
 
 `F1` editor · `F2` perf · `F3` colliders · `F4` overlays · `F5` zoo · `F6` range
-· `P` pause · `R` restart · `,` `.` cycle in the inspection levels.
+· `F7` screenshot · `P` pause · `R` restart · `,` `.` cycle in the inspection
+levels.
+
+## Seeing the game
+
+**You can look at the game.** `tools/capture.sh <out.png> [flags]` drives it
+from the command line and writes a PNG in about a second — no window to sit in
+front of, nothing to ask the user to do. Any drawn surface is reachable:
+`--mode zoo|range`, `--editor <page>`, `--do "<editor action label>"`,
+`--press <input action>`, `--set <schema key>=<value>`, `--overlays`, `--perf`.
+The README has the full list.
+
+Take one after any change to a drawn surface and *look at it*. The tests cover
+the simulation and cannot see a widget drawn at the wrong scale, text
+overlapping a panel, or a screen-space overlay landing in the wrong place —
+every bug found in the draw path so far has been found this way.
+
+A capture is reproducible: `--seed` pins both generators and the simulation is
+frozen apart from the fixed-step warm-up, so the same command line gives a
+byte-identical PNG. Two captures of the same command line before and after a
+change are a real before/after.
 
 ## Conventions
 
@@ -72,8 +93,8 @@ branch other than `main`.
 
 After merging, verify the combination before handing it over: `luajit
 tools/test.lua`, plus the balance harness if the merge touched the simulation
-and a screen capture if it touched the UI. Two branches that each passed alone
-can still be broken together.
+and `tools/capture.sh` if it touched anything drawn. Two branches that each
+passed alone can still be broken together.
 
 Worktrees are still the right place to *do* the work — they keep parallel
 branches from fighting over one checkout. They are a workspace, not a delivery

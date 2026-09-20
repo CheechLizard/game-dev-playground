@@ -1,7 +1,10 @@
 -- LÖVE keys the save directory to t.identity -- to the string, not to the
 -- checkout. A fixed identity means every worktree shares one save folder, so
--- two parallel agents capturing screenshots silently overwrite each other's
--- PNGs. Deriving it from the source directory keeps parallel checkouts apart.
+-- two parallel agents writing the same filename silently overwrite each
+-- other's. Captures and profiles are written into the checkout and only fall
+-- back here, but the fallback is exactly the case where a collision would be
+-- confusing. Deriving the identity from the source directory keeps parallel
+-- checkouts apart.
 -- The canonical clone keeps the plain name, so its existing saves still resolve.
 local function identity()
   local dir = (love.filesystem.getSource() or ""):match("([^/\\]+)[/\\]*$")

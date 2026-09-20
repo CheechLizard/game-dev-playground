@@ -9,6 +9,9 @@
 -- Run from the repo root so profile writes land in the repo:
 --     love .
 --     love . --game horde-survivor
+--
+-- Screenshots are driven from the same command line; see
+-- shared/framework/capture.lua for the flags.
 
 love.filesystem.setRequirePath(
   "shared/?.lua;shared/?/init.lua;?.lua;?/init.lua")
@@ -17,6 +20,7 @@ local config = require("framework.config")
 local profiles = require("framework.profiles")
 local debugdraw = require("framework.debugdraw")
 local editor = require("framework.editor")
+local capture = require("framework.capture")
 local perf = require("framework.perf")
 local input = require("framework.input")
 local ui = require("framework.ui")
@@ -78,24 +82,46 @@ function love.load()
   input.init()
   love.graphics.setFont(fonts.role("body"))
   game.load()
+
+  -- Last, so a capture plan acts on a game that is already running.
+  capture.begin(arg, {
+    game = game, config = config, schema = require("framework.schema"),
+    profiles = profiles, editor = editor, debugdraw = debugdraw, input = input,
+  })
 end
 
 function love.resize()
   recomputeLetterbox()
 end
 
-function love.update(dt)
+-- One frame of bookkeeping. `simulate` is false only while a capture is
+-- holding the world still for the frame it is about to shoot: the UI and the
+-- perf counters still need their frame, but a variable-dt step would make the
+-- screenshot differ from run to run.
+local function frame(dt, simulate)
   perf.beginFrame()
   -- Clamp dt so a hitch or a drag of the window does not teleport everything.
   dt = math.min(dt, 1 / 20)
 
   profiles.update(dt)
   ui.beginFrame()
-  perf.push("game.update")
-  game.update(dt)
-  perf.pop()
+  if simulate then
+    perf.push("game.update")
+    game.update(dt)
+    perf.pop()
+  end
   input.clear()
   perf.endFrame(dt)
+end
+
+function love.update(dt)
+  -- A capture fast-forwards the simulation before the frame it shoots. It
+  -- advances the game rather than the whole frame: perf counters and the UI
+  -- are per-frame bookkeeping, and running hundreds of them in one tick would
+  -- leave both holding nonsense.
+  capture.advance(game.update, { editor = editor, input = input })
+
+  frame(dt, not capture.frozen())
 end
 
 function love.draw()
@@ -117,6 +143,10 @@ function love.draw()
   end
   editor.draw()
   ui.endFrame()
+
+  -- The frame is finished, so this is the only point a screenshot of it can
+  -- be asked for.
+  capture.afterDraw()
 end
 
 function love.keypressed(key, scancode, isrepeat)
@@ -126,6 +156,12 @@ function love.keypressed(key, scancode, isrepeat)
   if key == "f4" then debugdraw.master = not debugdraw.master return end
   if key == "f5" and game.setMode then game.setMode("zoo") return end
   if key == "f6" and game.setMode then game.setMode("range") return end
+  if key == "f7" then
+    -- No on-screen confirmation: the play surface stays clear. The path is
+    -- printed, and shown in the editor footer when the editor is open.
+    editor.notify("Screenshot: " .. capture.shot())
+    return
+  end
 
   ui.keypressed(key)
   if ui.capturingKeyboard() then return end

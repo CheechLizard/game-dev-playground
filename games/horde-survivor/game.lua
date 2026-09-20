@@ -238,8 +238,11 @@ end
 
 -- -------------------------------------------------------------------- load
 
-function game.restart()
-  current = runModule.new(os.time() + math.floor(love.timer.getTime() * 1000))
+--- Start a fresh run. A seed makes the run reproducible, which is what the
+-- screenshot path passes so the same command line captures the same frame.
+function game.restart(seed)
+  current = runModule.new(seed or
+    (os.time() + math.floor(love.timer.getTime() * 1000)))
   current.summaryCache = nil
   render.snapCamera(current)
   config.clearRestartPending()
@@ -247,7 +250,7 @@ end
 
 function game.load()
   registerDebugActions()
-  editor.hook("restartRun", game.restart)
+  editor.hook("restartRun", function() game.restart() end)
   game.restart()
 end
 

@@ -220,6 +220,81 @@ do
   os.execute('rm -rf "' .. profiles.dir .. '"')
 end
 
+-- ---------------------------------------------------------------- capture
+
+local capture = require("framework.capture")
+
+suite("capture")
+do
+  check("no --capture means no plan", capture.parse({ "--game", "x" }) == nil)
+
+  local plan = capture.parse({ "--capture", "captures/a.png" })
+  eq("path survives", plan.path, "captures/a.png")
+  eq("default warm-up", plan.at, 2)
+  eq("does not hold by default", plan.hold, false)
+
+  eq("bare name lands in captures/",
+    capture.parse({ "--capture", "hud" }).path, "captures/hud.png")
+  eq("a path is left alone",
+    capture.parse({ "--capture", "/tmp/x" }).path, "/tmp/x.png")
+
+  plan = capture.parse({ "--capture", "a", "--at", "8", "--seed", "7",
+    "--mode", "zoo", "--profile", "fast", "--overlays", "--perf", "--hold" })
+  eq("--at", plan.at, 8)
+  eq("--seed", plan.seed, 7)
+  eq("--mode", plan.mode, "zoo")
+  eq("--profile", plan.profile, "fast")
+  check("--overlays", plan.overlays)
+  check("--perf", plan.perf)
+  check("--hold", plan.hold)
+
+  plan = capture.parse({ "--capture", "a", "--set", "debug.godMode=true",
+    "--set", "run.length=4" })
+  eq("--set repeats", #plan.sets, 2)
+  eq("--set key", plan.sets[1].key, "debug.godMode")
+  eq("--set value", plan.sets[2].raw, "4")
+
+  plan = capture.parse({ "--capture", "a", "--do", "Open shop",
+    "--press", "next", "--press", "next" })
+  eq("--do", plan.actions[1], "Open shop")
+  eq("--press repeats", #plan.presses, 2)
+
+  -- --editor takes an optional page, so it must not eat the next flag.
+  plan = capture.parse({ "--capture", "a", "--editor", "--perf" })
+  check("--editor alone", plan.editor and plan.editorPage == nil)
+  check("--editor does not eat the next flag", plan.perf)
+  eq("--editor page", capture.parse({ "--capture", "a", "--editor", "Debug" }).editorPage,
+    "Debug")
+
+  -- The launcher passes its own flags through the same table.
+  plan = capture.parse({ "--game", "horde-survivor", "--capture", "a", "--at", "3" })
+  eq("ignores unrelated flags", plan.at, 3)
+
+  local bad, err = capture.parse({ "--capture" })
+  check("--capture needs a value", bad == nil and err ~= nil, err)
+  bad, err = capture.parse({ "--capture", "a", "--at", "soon" })
+  check("--at rejects nonsense", bad == nil and err ~= nil, err)
+  bad, err = capture.parse({ "--capture", "a", "--mode", "kitchen" })
+  check("--mode rejects an unknown level", bad == nil and err ~= nil, err)
+  bad, err = capture.parse({ "--capture", "a", "--set", "godMode" })
+  check("--set needs key=value", bad == nil and err ~= nil, err)
+  bad, err = capture.parse({ "--at", "3" })
+  check("a capture flag without --capture is an error", bad == nil and err ~= nil, err)
+
+  -- A command line only carries strings; the schema types do the rest.
+  eq("bool from true", capture.coerceSet({ type = "bool" }, "true"), true)
+  eq("bool from 0", capture.coerceSet({ type = "bool" }, "0"), false)
+  check("bool rejects nonsense", capture.coerceSet({ type = "bool" }, "maybe") == nil)
+  eq("number is left for the schema to coerce",
+    capture.coerceSet({ type = "number" }, "2.5"), "2.5")
+  local colour = capture.coerceSet({ type = "color" }, "1,0.5,0")
+  check("colour splits on commas",
+    colour and colour[1] == 1 and colour[2] == 0.5 and colour[3] == 0)
+  check("colour needs three parts",
+    capture.coerceSet({ type = "color" }, "1,0") == nil)
+  check("unknown setting", capture.coerceSet(nil, "1") == nil)
+end
+
 -- ------------------------------------------------------------- simulation
 
 local simOk, simErr = pcall(function()

@@ -37,23 +37,39 @@ use LuaJIT, which is 5.1-compatible and is the VM LÖVE itself runs:
 
 ```bash
 brew install luajit
-luajit tools/test.lua        # 98 tests, ~5s
+luajit tools/test.lua        # 132 tests, ~5s
 luajit tools/balance.lua --runs 5
 ```
 
-## Do this first
+## The draw path has now been rendered
 
-**Nothing here has ever been rendered.** It was built in a cloud container with
-no display. The simulation is covered by 96 passing headless tests; every line
-of drawing code — editor UI, HUD, shop, summary, sprites, overlays — has never
-executed.
+This was built in a cloud container with no display, and for a long time no
+line of drawing code had ever executed. It has now: `tools/capture.sh` drives
+the game from the command line and writes a PNG, so any drawn surface can be
+looked at without a human at the keyboard. See the README for the flags.
 
 ```bash
-love .          # from the repo root, not from games/horde-survivor
+love .                                          # from the repo root
+tools/capture.sh hud.png --at 8 --seed 7        # or just look at a frame
 ```
 
-Expect first-launch breakage in the draw path. Likely suspects, roughly in
-order:
+What has been rendered and is confirmed working: the HUD, the run itself, the
+editor (sidebar, generated controls, sliders, toggles, action buttons, footer),
+the shop grid with its drawn icons, the end-of-run summary, the pause overlay,
+the zoo and the range with their stat panels, and the perf panel.
+
+Two draw bugs the captures did find, neither fixed yet:
+
+- **Debug-overlay labels are drawn at window scale, not canvas scale.** With
+  `--overlays` on, the per-enemy state text renders roughly 3x too large and
+  overlaps into an unreadable pile. The geometry (collider circles, spawn
+  rings) is fine; it is only the text.
+- **The perf panel overlaps the shop.** `F2` draws in screen space over
+  everything, and the shop grid runs full width, so the panel sits on top of
+  the right-hand column of offers.
+
+Still unverified, because a still frame cannot show either: mouse interaction
+in the editor, and anything that only appears in motion. The suspects:
 
 - `shared/framework/ui.lua` — the scroll region translates the canvas and
   offsets the mouse to match (`beginScroll`/`endScroll`). If clicks land on the
@@ -62,10 +78,9 @@ order:
   cursor by hand (`opts.x`/`opts.y` in `ui.button`). Overlapping or stacked
   controls on the Profiles page point here.
 - `games/horde-survivor/render.lua` — camera translate plus integer scaling.
-  Pixel shimmer or a half-pixel jitter means the `math.floor` on the camera
-  translate is not matching the canvas scale.
-- `love.graphics.captureScreenshot` and canvases behave differently under
-  software GL; that is a container problem, not a code problem.
+  Pixel shimmer or a half-pixel jitter while the camera moves means the
+  `math.floor` on the camera translate is not matching the canvas scale. A
+  capture holds the world still, so it cannot rule this out.
 
 ## Decisions already made
 
