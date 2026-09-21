@@ -1,7 +1,9 @@
 # Modular Weapon System — Design Specification v2.0
 
-**Status:** design draft; agreed rules plus explicitly identified open decisions.  
-**Updated:** 20 September 2026.  
+**Status:** design draft; agreed rules plus explicitly identified open decisions.
+
+**Updated:** 20 September 2026.
+
 **Implementation status:** the game currently implements an earlier model. This
 document specifies the revised design; it does not claim that the runtime or
 editor already implements it.
