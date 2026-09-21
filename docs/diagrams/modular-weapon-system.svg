@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2130" viewBox="0 0 1400 2130" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2540" viewBox="0 0 1400 2540" role="img" aria-labelledby="title desc">
   <title id="title">Modular Weapon System — module interactions and strike lifecycle</title>
-  <desc id="desc">An application adapter supplies a frame bitstream to ordered triggers and direction to optional barrels. A striker starts when the trigger is hot and its independent sequence rail holds enough energy. Batteries refill that rail; the rail funds collider movement and optional ordered payloads. The striker emits individual Hit events and one final Complete with a hit count. A downstream Miss trigger accepts only zero-hit completion; a Complete trigger accepts every completion. The next sequence has its own batteries and receives no energy from the first. Insufficient startup energy skips a firing opportunity. Active exhaustion completes the strike, and a still-hot trigger can start a fresh strike when energy recovers. This is a functional flow chart, not a mandatory graph order.</desc>
+  <desc id="desc">An application adapter supplies a frame bitstream to ordered triggers and direction to optional barrels. A striker starts when the trigger is hot and its independent sequence rail holds enough energy. Batteries refill that rail; the rail funds collider movement and optional ordered payloads. The striker emits individual Hit events and one final Complete with a hit count. A downstream Miss trigger accepts only zero-hit completion; a Complete trigger accepts every completion. The next sequence has its own batteries and receives no energy from the first. Insufficient startup energy skips a firing opportunity. Active exhaustion completes the strike, and a still-hot trigger can start a fresh strike when energy recovers. Multi before Striker requires a fully funded volley of independent strikes. Multi after Striker divides one funded output across dimmer children with one combined hit count and completion. This is a functional flow chart, not a mandatory graph order.</desc>
   <defs>
     <marker id="flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#385c75"/></marker>
     <marker id="energy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#9b6513"/></marker>
@@ -22,7 +22,7 @@
       .eventline { fill: none; stroke: #71529a; stroke-width: 3; marker-end: url(#event); }
     </style>
   </defs>
-  <rect width="1400" height="2130" fill="#f8fafb"/>
+  <rect width="1400" height="2540" fill="#f8fafb"/>
   <text x="50" y="65" class="heading">Modular Weapon System</text>
   <text x="50" y="104" class="sub">Module interactions · independent sequence power · Hit and Complete events</text>
   <path d="M 850 148 H 910" class="line"/><text x="926" y="155" class="small">Signal / direction</text>
@@ -149,5 +149,24 @@
   <path d="M 250 1953 V 1987 H 449" fill="none" stroke="#385c75" stroke-width="3"/>
   <path d="M 700 1953 V 1987" fill="none" stroke="#385c75" stroke-width="3"/>
   <text x="700" y="2027" text-anchor="middle" class="small">Reservoir replenishes under battery subclass rules; a cold trigger does not fire.</text>
-  <text x="50" y="2093" class="small">Design v2.0 · 20 September 2026 · Current runtime still implements the earlier model</text>
+  <text x="50" y="2110" class="section">MULTI ORDER CHANGES COST AND OUTPUT</text>
+  <rect x="50" y="2140" width="630" height="310" rx="14" class="power"/>
+  <text x="80" y="2185" class="name">Multi → Striker</text>
+  <text x="80" y="2230" class="body">Reserve all 3 startups before firing.</text>
+  <text x="80" y="2268" class="body">3 full-power strikes, or skip the whole volley.</text>
+  <circle cx="225" cy="2330" r="13" fill="#385c75"/>
+  <circle cx="365" cy="2330" r="13" fill="#385c75"/>
+  <circle cx="505" cy="2330" r="13" fill="#385c75"/>
+  <text x="80" y="2390" class="small">Each strike has its own hits and Complete.</text>
+  <text x="80" y="2423" class="small">Battery tick = the combined startup cost.</text>
+  <rect x="720" y="2140" width="630" height="310" rx="14" class="box"/>
+  <text x="750" y="2185" class="name">Striker → Multi</text>
+  <text x="750" y="2230" class="body">Pay 1 startup; divide the output 3 ways.</text>
+  <text x="750" y="2268" class="body">Each child gets ⅓ power and looks dimmer.</text>
+  <circle cx="895" cy="2330" r="13" fill="#385c75" opacity="0.58"/>
+  <circle cx="1035" cy="2330" r="13" fill="#385c75" opacity="0.58"/>
+  <circle cx="1175" cy="2330" r="13" fill="#385c75" opacity="0.58"/>
+  <text x="750" y="2390" class="small">Combined hits; Complete after the last child.</text>
+  <text x="750" y="2423" class="small">Battery tick = one original startup cost.</text>
+  <text x="50" y="2503" class="small">Design v2.0 · 21 September 2026 · Playable subset: see MWS_Implementation.md</text>
 </svg>

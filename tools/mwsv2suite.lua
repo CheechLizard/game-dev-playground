@@ -333,9 +333,10 @@ function tests.run(suite,check,eq,near)
         wire(g,b,s) wire(g,s,a)
       end
       local r,h=world(g) ticks(r,4,true)
-      eq("multi produces three strikes on each pulse on either side of striker",r.stats.fired,6)
+      eq("Multi order determines strikes per pulse",r.stats.fired,after and 2 or 6)
+      eq("either Multi order produces three colliders per pulse",#h.spawned,6)
       check("multi directions are distinct",h.spawned[1].dirY~=h.spawned[3].dirY)
-      near("fan spends the shared rail once per actual collider",r.sequences[1].energy,94)
+      near("Multi before Striker pays per strike; Multi after splits one",r.sequences[1].energy,after and 98 or 94)
     end
     local g,_,_,a,s=fixture("repeater","ranged",{trigger={periodTicks=3,pulseTicks=1}})
     M.set(a,"subclass","alternating") M.set(a,"count",2)
@@ -344,6 +345,187 @@ function tests.run(suite,check,eq,near)
     local r,h=world(g) ticks(r,7,true)
     eq("cold routes rearm Singles after alternating barrels",r.stats.fired,3)
     near("alternating resets to its first lane after full cycle",h.spawned[1].dirY,h.spawned[3].dirY)
+  end
+  suite("mws v2: Multi before Striker reserves whole volleys")
+  do
+    local g,_,b,a,s=fixture("inverter","ranged",{battery={capacity=3,fillRate=60,initialCharge=0}})
+    M.set(a,"subclass","multi") M.set(a,"count",3) M.set(a,"spread",60)
+    local r,h=world(g)
+    near("pre-Striker Multi battery tick marks the full volley",r.info[b.id].startupCosts[1],3)
+    ticks(r,2,false)
+    eq("low charge never emits a partial Multi volley",r.stats.fired,0)
+    near("skipped volleys preserve charge for the full pattern",r.sequences[1].energy,2)
+    eq("skipped Multi produces no Complete or Miss",r.stats.completed+r.stats.misses,0)
+    ticks(r,1)
+    eq("hot Multi resumes at the full volley threshold",r.stats.fired,3)
+    near("full volley pays once for all three strikes",r.sequences[1].energy,0)
+    near("full pattern retains its centre shot",h.spawned[2].dirY,0)
+    near("full pattern keeps both sides symmetric",h.spawned[1].dirY,-h.spawned[3].dirY)
+    near("pre-Striker Multi retains full output power",h.spawned[1].share,1)
+    ticks(r,3) eq("refill produces another complete volley",r.stats.fired,6)
+    M.set(b,"capacity",2) M.set(b,"initialCharge",1)
+    r=world(g) ticks(r,20,false)
+    eq("capacity below the whole volley never fires",r.stats.fired,0)
+    near("impossible volleys never spend partial energy",r.sequences[1].energy,2)
+    local warned=false
+    for _,p in ipairs(r.problems) do if p.level=="warn" and p.nodeId==s.id then warned=true end end
+    check("full volley above capacity produces a warning",warned)
+
+    M.set(g.nodes[g.order[1]],"subclass","single")
+    M.set(b,"capacity",3) M.set(b,"initialCharge",0)
+    r=world(g) ticks(r,1,true) ticks(r,5,false)
+    eq("an unaffordable Single volley is not queued for later refill",r.stats.fired,0)
+    ticks(r,1,true) eq("a fresh press fires the charged volley",r.stats.fired,3)
+
+    local second=node(g,"barrel","multi",{count=2})
+    G.disconnect(g,a.id,1) wire(g,a,second) wire(g,second,s)
+    M.set(b,"capacity",5) M.set(b,"initialCharge",1) M.set(b,"fillRate",0)
+    r=world(g) ticks(r,1,true)
+    eq("nested pre-Striker Multi cannot leak one affordable inner volley",r.stats.fired,0)
+    near("nested pre-Striker mark includes every strike",r.info[b.id].startupCosts[1],6)
+    M.set(b,"capacity",6) r=world(g) ticks(r,1,true)
+    eq("nested pre-Striker Multi starts all six strikes",r.stats.fired,6)
+    near("nested Multi does not charge twice",r.sequences[1].energy,0)
+
+    -- Moving the second Multi after Striker halves each output, not doubles cost.
+    G.disconnect(g,a.id,1) G.disconnect(g,second.id,1) wire(g,a,s) wire(g,s,second)
+    M.set(b,"capacity",3) r,h=world(g) ticks(r,1,true)
+    eq("combined orders start three logical strikes",r.stats.fired,3)
+    eq("each of those strikes splits into two colliders",#h.spawned,6)
+    near("post-Striker split does not inflate the pre-Striker cost mark",r.info[b.id].startupCosts[1],3)
+    near("combined orders pay just three startups",r.sequences[1].energy,0)
+    near("combined orders halve each child's output",h.spawned[1].share,0.5)
+
+    local mixed,_,battery,multi=fixture("single","ranged",{battery={capacity=5,fillRate=0}})
+    M.set(multi,"subclass","multi") M.set(multi,"count",3)
+    local expensive=node(mixed,"striker","ranged",{startupCost=4,sizeCost=0,draw=0,distanceCost=0})
+    wire(mixed,multi,expensive,2)
+    local rt=world(mixed) ticks(rt,1,true)
+    eq("differently priced lanes are still an indivisible volley",rt.stats.fired,0)
+    near("mixed-lane mark counts cyclic routing and each cost",rt.info[battery.id].startupCosts[1],6)
+    M.set(battery,"capacity",6) rt=world(mixed) ticks(rt,1,true)
+    eq("mixed-lane volley starts at its combined threshold",rt.stats.fired,3)
+    near("mixed-lane reservation pays the actual total",rt.sequences[1].energy,0)
+    r=world(g)
+    for i=1,510 do r.strikes[i]={alive=false} end
+    ticks(r,1,true)
+    eq("collider limit cannot truncate a Multi pattern",r.stats.fired,0)
+    near("collider limit consumes no energy",r.sequences[1].energy,3)
+  end
+  suite("mws v2: Multi after Striker shares output and lifecycle")
+  do
+    local function split(options,trigger,mode)
+      local g,t,b,a,s=fixture(trigger or "single",mode or "ranged",options)
+      M.set(a,"subclass","multi") M.set(a,"count",3) M.set(a,"spread",60)
+      G.disconnect(g,b.id,1) G.disconnect(g,a.id,1) wire(g,b,s) wire(g,s,a)
+      return g,t,b,a,s
+    end
+    local g,_,b,a,s=split({battery={capacity=1,fillRate=0}})
+    local r,h=world(g) ticks(r,1,true)
+    eq("one startup funds a complete post-Striker split",r.stats.fired,1)
+    eq("one funded strike produces all three colliders",#h.spawned,3)
+    near("post-Striker battery tick marks one startup",r.info[b.id].startupCosts[1],1)
+    near("post-Striker split pays startup only once",r.sequences[1].energy,0)
+    near("each split child receives a third of output",h.spawned[1].share,1/3)
+    check("split children are visibly dimmer",h.spawned[1].state.brightness<1)
+    eq("single strike has no duplicate capacity warning",#r.problems,0)
+    ticks(r,25,false)
+    eq("all missing children emit one Complete",r.stats.completed,1)
+    eq("all missing children count as one Miss",r.stats.misses,1)
+
+    -- Identical payload coverage spends and deals one strike's total energy.
+    g,_,b,a,s=split()
+    local payload=node(g,"payload","sharp",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    local targets={target(10*math.cos(math.rad(30)),-5),target(10),target(10*math.cos(math.rad(30)),5)}
+    r,h=world(g,targets) ticks(r,20,true)
+    near("three split hits deal one full strike's damage",h.damageTotal,12)
+    for i,e in ipairs(targets) do near("split child "..i.." deals one-third damage",e.hp,96) end
+    near("payload costs are divided along with damage",r.sequences[1].energy,93)
+    eq("split hits accumulate into the original strike",r.stats.hits,3)
+    eq("split hit volley completes once",r.stats.completed,1)
+    eq("hit volley never qualifies as a Miss",r.stats.misses,0)
+    for i=1,3 do eq("Hit event carries the running combined count "..i,r.log[i].hitCount,i) end
+    eq("single Complete carries all split hits",r.log[4].hitCount,3)
+
+    -- The centre child finishes early; the siblings must finish before Complete.
+    for _,event in ipairs({"complete","miss"}) do
+      g,_,b,a,s=split() local _,childBattery=downstream(g,s,event,10)
+      r,h=world(g,{target(4)}) ticks(r,5,true)
+      eq("one finished child does not complete its parent",r.stats.completed,0)
+      ticks(r,25,false)
+      eq(event.." activates only once and obeys aggregate hit count",r.stats.fired,event=="complete" and 2 or 1)
+      near("downstream reservoir is charged only by its own event",r.sequences[2].energy,event=="complete" and 9 or 10)
+      near("downstream battery mark remains independent",r.info[childBattery.id].startupCosts[1],1)
+    end
+    g,_,b,a,s=split() downstream(g,s,"miss",10)
+    r=world(g) ticks(r,30,true)
+    eq("one all-miss split activates its downstream Miss once",r.stats.fired,2)
+
+    -- Even an uneven tree conserves the original output share.
+    g,_,b,a,s=split() M.set(a,"count",2)
+    local nested=node(g,"barrel","multi",{count=3,spread=30}) wire(g,a,nested)
+    local forward=node(g,"barrel","forward") wire(g,a,forward,2)
+    r,h=world(g) ticks(r,1,true)
+    eq("nested post-Striker splits still pay one startup",r.stats.fired,1)
+    eq("uneven split creates four colliders",#h.spawned,4)
+    local sum=0 for _,child in ipairs(h.spawned) do sum=sum+child.share end
+    near("nested shares add to exactly one original output",sum,1)
+    near("nested leaf gets one sixth",h.spawned[1].share,1/6)
+    near("unsplit sibling keeps its half",h.spawned[4].share,0.5)
+    near("nested splits do not inflate startup mark",r.info[b.id].startupCosts[1],1)
+
+    g,_,b,a,s=split({striker={draw=6,distanceCost=0.1}})
+    r,h=world(g) ticks(r,5,true)
+    near("split travel and continuing work share one total draw",r.sequences[1].energy,98)
+    near("initial split tuning preserves speed and reach",h.spawned[1].dist,5)
+
+    g,_,b,a,s=split({striker={hitLimit=2}},"single","piercing") M.set(a,"spread",0)
+    r=world(g,{target(5),target(10)}) ticks(r,15,true)
+    eq("split piercing children retain their own penetration limits",r.stats.hits,6)
+    eq("split piercing has one completion after all children finish",r.stats.completed,1)
+    eq("piercing Complete includes all children's contacts",r.log[#r.log].hitCount,6)
+
+    g,_,b,a,s=split({battery={capacity=2,fillRate=0}},"toggle","stab")
+    payload=node(g,"payload","sharp",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,10,false)
+    eq("one child's payload exhaustion leaves its siblings active",#r.strikes,2)
+    eq("an ended child does not restart while its parent stays active",#h.spawned,3)
+    eq("a partially active split has not completed",r.stats.completed,0)
+    r:clear()
+    eq("reset silently clears the logical parent too",h.spawned[1].group.alive,false)
+    eq("reset does not manufacture a Complete",r.stats.completed,0)
+
+    -- Continuous damage also shares the budget on every tick.
+    g,_,b,a,s=split(nil,"toggle","stab") M.set(a,"spread",0)
+    payload=node(g,"payload","plasma",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,9,false)
+    near("split beams share total damage per second",h.damageTotal,2)
+    near("split beams share total payload draw",r.sequences[1].energy,98)
+    eq("same-target contacts from separate children each count once",r.stats.hits,3)
+    M.set(s,"releaseEnds",true) ticks(r,1,true)
+    eq("release ends all split children with one completion",r.stats.completed,1)
+    eq("release removes every split collider",#r.strikes,0)
+    eq("release Complete retains their combined hit count",r.log[#r.log].hitCount,3)
+
+    g,_,b,a,s=split({battery={capacity=2,fillRate=0},striker={draw=60}},"toggle","stab")
+    r,h=world(g) ticks(r,1,true)
+    eq("split beam starts every child together",#r.strikes,3)
+    ticks(r,1,false)
+    eq("movement exhaustion ends the entire split together",#r.strikes,0)
+    eq("exhaustion emits one Complete",r.stats.completed,1)
+    eq("exhaustion records its reason",r.log[#r.log].reason,"energy")
+    M.set(b,"fillRate",30) r,h=world(g) ticks(r,1,true) ticks(r,6,false)
+    check("a hot split restarts after refill",r.stats.fired>1)
+    check("refill creates a fresh parent strike",h.spawned[1].group~=h.spawned[4].group)
+
+    -- A huge post-Striker fan fails atomically before spending startup.
+    g,_,b,a,s=split() M.set(a,"count",8)
+    local prev=a
+    for _=1,3 do local n=node(g,"barrel","multi",{count=8}) wire(g,prev,n) prev=n end
+    r=world(g) ticks(r,1,true)
+    eq("oversized split cannot create a truncated pattern",r.stats.fired,0)
+    eq("oversized split reports the safety limit",r.stats.limited,1)
+    near("oversized split spends no startup energy",r.sequences[1].energy,100)
   end
   suite("mws v2: payloads and release")
   do

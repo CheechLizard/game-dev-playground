@@ -357,7 +357,9 @@ function render.draw(r)
   for _, st in ipairs(r.strikes or {}) do
     local sz = st.state.collisionSize
     local kind = st.state.visual
-    g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
+    local brightness=st.state.brightness or 1
+    local red,green,blue=playerCol[1]*brightness,playerCol[2]*brightness,playerCol[3]*brightness
+    g.setColor(red,green,blue,1)
     if st.v2 and (st.node.props.subclass=="stab" or st.node.props.subclass=="sweep") then
       local reach=st.node.props.range
       g.setLineWidth(math.max(1,sz*2))
@@ -365,9 +367,9 @@ function render.draw(r)
       g.setLineWidth(1)
     elseif st.v2 and st.node.props.subclass=="area" and st.node.props.arc<360 then
       local half=math.rad(st.node.props.arc)/2
-      g.setColor(playerCol[1],playerCol[2],playerCol[3],0.3)
+      g.setColor(red,green,blue,0.3)
       g.arc("fill","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
-      g.setColor(playerCol[1],playerCol[2],playerCol[3],0.85)
+      g.setColor(red,green,blue,0.85)
       g.arc("line","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
     elseif kind == "bolt" then
       local lx, ly = st.dirX * sz * 2.5, st.dirY * sz * 2.5
@@ -382,9 +384,9 @@ function render.draw(r)
       g.circle("line", st.x, st.y, sz + 1)
       g.circle("fill", st.x, st.y, sz * 0.45)
     elseif kind == "field" then
-      g.setColor(playerCol[1], playerCol[2], playerCol[3], 0.30)
+      g.setColor(red,green,blue, 0.30)
       g.circle("fill", st.x, st.y, sz)
-      g.setColor(playerCol[1], playerCol[2], playerCol[3], 0.85)
+      g.setColor(red,green,blue, 0.85)
       g.circle("line", st.x, st.y, sz)
     elseif kind == "spark" then
       g.rectangle("fill", st.x - sz, st.y - 0.5, sz * 2, 1)

@@ -105,8 +105,11 @@ experimental choices. The two vocabularies are separated below.
 | **Forward Barrel** | Passes incoming DOI unchanged, with no angle offset. |
 | **Directional Barrel** | Adds a configured angle to incoming DOI. At zero offset it behaves like Forward. |
 | **Spread Barrel** | Samples a direction inside its cone, using a symmetric bell-shaped distribution that favours the centre. Multi/Alternating remain evenly spaced fans. |
+| **Multi Barrel** | Before Striker, requests a whole volley of full-power strikes. After Striker, divides one strike's output across its lanes. |
+| **Volley** | The full set of strike starts requested through an upstream Multi in one opportunity. Reserve their combined startup cost or skip them all. |
+| **Split strike** | One funded strike with several child colliders. Shares divide at each downstream Multi; children draw and deal their share of energy and appear dimmer. Hits accumulate together; Complete occurs once after the last child ends. |
 | **Startup cost** | Energy required to start one strike. Above capacity it can never start; above current stored energy the firing opportunity is skipped. |
-| **Battery charge indicator** | Live fill of the sequence's stored energy relative to capacity. Side ticks mark distinct strike startup costs; an upward chevron marks a cost above capacity. All batteries on one rail show the same shared pool. |
+| **Battery charge indicator** | Live fill of the sequence's stored energy relative to capacity. Side ticks mark distinct startup requirements: full-volley cost for upstream Multi, one startup for a split strike. Conditional volleys show their largest configured cost. An upward chevron marks a cost above capacity. All batteries on one rail show the same shared pool. |
 | **Exhaustion** | Inability to fund a required continuing cost; ends an active strike. Subsequent firing creates a fresh strike rather than resuming it. |
 | **Hit** | An event for a qualifying contact during a strike, with accumulated hit count. Counting rules for sustained AOE remain open. |
 | **Complete** | One final event when an actual strike ends, including through energy exhaustion; carries final hit count. A skipped start has no completion event. |

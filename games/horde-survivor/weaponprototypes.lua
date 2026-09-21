@@ -73,4 +73,26 @@ add("v2_sweep","V2 / Sweep",function()
     effect={energy=4,efficiency=3},
   })
 end)
+-- Same settings, different order: compare volley charge and bullet brightness.
+local function multiPreset(id,name,split)
+  local g,_,b,a,s,p=base(id,name,"repeater","ranged",{
+    barrel="multi",trigger={periodTicks=30,pulseTicks=1},
+    battery={capacity=36,fillRate=18},
+    striker={startupCost=8,sizeCost=0,draw=2,distanceCost=0.01,speed=130,range=180},
+    effect={energy=6,efficiency=2,effect="none"},
+  })
+  M.set(a,"spread",60)
+  if split then
+    G.disconnect(g,b.id,1) G.disconnect(g,a.id,1) G.disconnect(g,s.id,1)
+    wire(g,b,s) wire(g,s,a) wire(g,a,p)
+    a.x,s.x=s.x,a.x
+  end
+  return g
+end
+add("v2_multi","V2 / Full volley",function()
+  return multiPreset("v2_multi","V2 / Full volley",false)
+end)
+add("v2_split","V2 / Split strike",function()
+  return multiPreset("v2_split","V2 / Split strike",true)
+end)
 return P

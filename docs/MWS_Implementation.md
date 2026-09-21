@@ -9,7 +9,7 @@ and its shop weapons still use the legacy runtime.
 ## Try it
 
 Run `love .` from `~/Dev/game-dev-playground/main`, then press **F8**.
-The first six bench weapons are v2 prototypes; **comma / period** cycles weapons.
+The first eight bench weapons are v2 prototypes; **comma / period** cycles weapons.
 The editor's **Levels → Bench → Prototype** setting also selects them.
 
 Bench enemies stay still by default so weapon movement is visible. Their AI,
@@ -39,9 +39,11 @@ moving enemies. The survival game is unaffected.
 | V2 / Complete + Field | Hold fire: each shot's completion starts a separately powered field, whether it hit or missed. Both reservoirs appear in the header. |
 | V2 / Delayed single | Tap, then move: a shot fires 60 ticks later from its captured origin. Release never cancels it. The downstream Seeking barrel selects a target at execution time. |
 | V2 / Sweep | Hold fire for repeated sweeps. Each runs to completion after its input pulse goes cold because Release ends strike is off. |
+| V2 / Full volley | Multi → Striker. Hold fire for three full-power bullets per volley, costing 24 startup energy. When charge is low, the whole volley skips until funded. |
+| V2 / Split strike | Striker → Multi. The same settings produce three dimmer bullets for 8 startup energy, each with one-third payload energy and damage. Compare the battery tick, cadence and brightness with Full volley. |
 
 The header shows stored energy / capacity and refill for each sequence. Fire,
-Hit, End, Miss and Skip counters show actual strikes, distinct contacts,
+Hit, End, Miss and Skip counters show logical strikes, child/target contacts,
 completions, zero-hit completions and unaffordable firing opportunities. Skips
 are never queued. The footer shows the latest event, sequence and hit count.
 Invalid graphs are inactive and display a validation message.
@@ -53,9 +55,12 @@ tile hot. A one-tick pulse lasts 1/60 second; the display does not extend it.
 
 Battery icons fill from the bottom with their sequence's stored energy divided
 by its total capacity. Batteries sharing a sequence display the same pool.
-A short tick beside the cell marks the energy needed to start one strike,
-including size and weight costs. Different branch costs get separate ticks;
-an upward chevron means a cost exceeds capacity. Continuing work and payload
+A short tick beside the cell marks the startup energy, including size and weight.
+Before-Striker Multi marks the combined full-volley cost; after-Striker Multi
+marks one original startup. Different costs get separate ticks. For intermediate
+gates or differently priced Alternating routes, the mark shows the largest
+configured volley; runtime reserves only the requests actually made that tick.
+An upward chevron means a cost exceeds capacity. Continuing work and payload
 spending drain the fill as they happen. The mark does not promise enough energy
 to finish a strike. Edits and Reset test refresh these indicators immediately.
 
@@ -104,9 +109,12 @@ These make unsettled parts testable; they do not amend the design specification.
    the multiplier, rounds to the nearest tick and clamps to at least two ticks.
    Effective width is capped at period minus one. These are provisional values.
 3. **Energy scheduling:** refill happens first, starts follow stable graph/port
-   order, then continuing costs follow creation order. Branches share one balance;
-   no fairness scheduler. Unaffordable whole-tick work ends the strike rather than
-   funding part of the tick.
+   order, then continuing costs follow creation order. Before-Striker Multi
+   reserves all requested startup costs together, including nested volleys;
+   insufficient energy skips the whole request. Split siblings reserve their
+   combined movement draw before any child moves. Unaffordable movement ends
+   the whole split; an unaffordable Payload ends that child. Branches still share
+   one balance with no fairness scheduler for Payload spending.
 4. **Costs:** startup is `startupCost + sizeCost × radius² × weight`. Continuing
    work costs `draw × dt + distanceCost × distance × weight`. Projectiles use
    actual travel; Orbit uses arc distance; Stab/Sweep use reach × dt. Sharp spends
@@ -114,24 +122,35 @@ These make unsettled parts testable; they do not amend the design specification.
    weight × max(0.1, speed / 100). Plasma spends configured energy/second **per
    overlapping target per tick**. Funded energy becomes damage through efficiency.
    The remaining reservoir is not automatically emptied on every hit.
-5. **Concurrency:** Ranged/Piercing request a collider each hot tick.
-   Stab/Sweep/Area/Orbit maintain one per execution route. Release ends sustained
-   strikes only when their setting enables it. Active initial direction stays
+   Post-Striker Multi pays startup once and gives each lane `incomingShare / N`.
+   Multiply continuing work and Payload energy by that share; damage follows
+   funded energy, including Impact's existing weight/speed factor. There is no
+   second reservoir or prepayment for unknown future contacts. Geometry, speed,
+   range and duration are unchanged in this first tuning pass. RGB brightness
+   uses `sqrt(share)` for readability. Ended children do not redistribute shares.
+5. **Concurrency:** Ranged/Piercing request a logical strike each hot tick.
+   Stab/Sweep/Area/Orbit maintain one per execution route, including all children
+   of a split. A finished child never restarts while its siblings remain active.
+   Release ends sustained strikes only when their setting enables it. Active initial direction stays
    fixed except Sweep/Orbit motion. Root sustained origins follow the wielder;
    event and delayed origins remain at their captured location.
-6. **Events:** hits count distinct targets per strike, including beams/fields.
+6. **Events:** hits count distinct targets per collider, including beams/fields.
    Sharp/Impact apply once per target; Plasma continues while overlapping.
-   Complete fires once with final hit count; Miss accepts only count zero.
+   Split children keep their own distinct-target sets and piercing limits;
+   contacts from two children against one target count as two Hits. Hit events
+   carry the combined count. Complete fires once when the last child ends, using
+   that child's endpoint, direction and reason; Miss accepts only a combined zero.
    Every qualifying event creates its own downstream execution context and
    one-tick pulse; all events from a tick arrive together next tick. Contexts
    own Trigger/Delay state but **share the sequence reservoir**. This is the
    provisional policy for the spec's unresolved collision-event batching.
 7. **Routing:** one parent per node, no cycles or multi-input joins.
    Multi/Alternating map directions cyclically across connected children in port
-   order; one connected child receives all lanes. A Striker before Multi applies
-   to every lane, each resulting collider paying its own cost. Separate physical
-   output paths create separate strike plans. Event branches connect directly
-   to the Striker.
+   order; one connected child receives all lanes. Before-Striker Multi creates
+   independent full-power strikes. After-Striker Multi creates one split family;
+   nested splits divide the incoming share again. Separate physical output paths
+   outside a split retain separate funded strike plans. Event branches connect
+   directly to the Striker.
 8. **Geometry:** Proximity uses an explicit sensor radius, independent of upstream
    gating. Enemies are circles; projectiles sweep their traveled segment, Stab/
    Sweep use thick lines, Area uses a circular sector, Orbit a moving circle.
@@ -153,7 +172,9 @@ These make unsettled parts testable; they do not amend the design specification.
    Acquisition, loot, and a new shop are not part of this build.
 10. **Limits/reset:** 512 live colliders and 256 execution contexts per weapon
     guard against runaway graphs. Excess work is dropped and increments a visible
-    LIMIT REACHED counter; it is never replayed. These are prototype guards, not
+    LIMIT REACHED counter; it is never replayed. Full volleys and split families
+    are rejected as a whole if their colliders do not fit. Post-Striker expansion
+    is bounded before spawning. These are prototype guards, not
     battery semantics. Authoring edits and Reset test deliberately clear work.
 
 ## Code and verification
@@ -162,13 +183,14 @@ These make unsettled parts testable; they do not amend the design specification.
 metadata from `triggers.lua`. Inspector, defaults and JSON use that registry.
 `v2graph.lua` compiles membership/reservoir totals; `v2runtime.lua` runs signals,
 energy, collisions and events through a host adapter. `framework/input.lua`
-normalizes devices above `mws/input.lua`. `weaponprototypes.lua` owns the six
+normalizes devices above `mws/input.lua`. `weaponprototypes.lua` owns the eight
 graphs. Version 2 survives save/load; unversioned graphs stay on the old runtime.
 
 `luajit tools/test.lua` covers Trigger traces, input coalescing, independent/additive
 reservoirs, dropped starts, exhaustion/restart, actual piercing collisions,
 Hit/Miss/Complete routing, shared energy across event contexts, delayed position,
-Barrel scope, JSON round-trips and game-host integration. Legacy tests remain.
+Barrel scope, full-volley reservations, split energy/damage conservation, nested
+shares, shared completion, JSON round-trips and game-host integration. Legacy tests remain.
 `luajit tools/balance.lua --runs 1 --seconds 180` compares the survival baseline.
 
 Reproducible visual checks use the Lua screenshot tool; no accessibility access

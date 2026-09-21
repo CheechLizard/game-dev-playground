@@ -307,7 +307,7 @@ function bench.drawOverlay(s, scale, ox, oy)
     stats.fired,stats.hits,stats.completed,stats.misses,stats.skipped,
     stats.limited>0 and "  LIMIT REACHED" or "")
   gfx.print(ui.ellipsise(problem
-    or status or string.format("%d modules   %d live strikes", #g.order, #s.run.strikes),
+    or status or string.format("%d modules   %d live colliders", #g.order, #s.run.strikes),
     ww - statusX - pad), statusX, statusY)
 
   -- ---- body: canvas on the left, the selected module's values on the right

@@ -84,6 +84,65 @@ local function targetStrikers(g,n,info)
   return out
 end
 
+-- Static startup marks describe the largest configured volley. Gates may
+-- suppress lanes and Alternating may choose a cheaper route at runtime.
+local function startupThresholds(g,seq,info)
+  local plans,demands={},{}
+  local function barrelDemand(n,visit)
+    local children=G.childrenOf(g,n)
+    if #children==0 then return nil end
+    local mode=n.props.subclass
+    local count=(mode=="multi" or mode=="alternating") and n.props.count or 1
+    local total=0
+    for lane=1,count do
+      local cost=visit(children[(lane-1)%#children+1].node)
+      if mode=="alternating" then total=math.max(total,cost) else total=total+cost end
+    end
+    return total
+  end
+  local function planCount(n)
+    if n.type=="trigger" then return 0 end
+    -- A post-Striker Multi splits one funded output, regardless of leaf count.
+    if n.type=="barrel" and n.props.subclass=="multi" then return 1 end
+    if plans[n.id] then return plans[n.id] end
+    local count
+    if n.type=="barrel" then
+      count=barrelDemand(n,planCount) or 1
+    end
+    if count==nil then
+      count=0
+      for _,c in ipairs(G.childrenOf(g,n)) do count=count+planCount(c.node) end
+      count=math.max(1,count)
+    end
+    plans[n.id]=count return count
+  end
+  local function demand(n)
+    if demands[n.id] then return demands[n.id] end
+    local cost
+    if n.type=="striker" then cost=G.startup(n)*planCount(n)
+    elseif n.type=="barrel" then cost=barrelDemand(n,demand) or 0 end
+    if cost==nil then
+      cost=0 for _,c in ipairs(G.childrenOf(g,n)) do cost=cost+demand(c.node) end
+    end
+    demands[n.id]=cost return cost
+  end
+  local costs,seen,thresholds={},{},{}
+  for _,n in ipairs(seq.nodes) do
+    if n.type=="striker" then
+      local owner,parent=nil,G.parentOf(g,n.id)
+      while parent and info[parent.id].sequence==seq.id do
+        if parent.type=="barrel" and parent.props.subclass=="multi" then owner=parent end
+        parent=G.parentOf(g,parent.id)
+      end
+      local cost=owner and demand(owner) or G.startup(n)
+      thresholds[n.id]=cost
+      if not seen[cost] then costs[#costs+1]=cost seen[cost]=true end
+    end
+  end
+  table.sort(costs)
+  return costs,thresholds
+end
+
 function G.compile(g)
   local sequences,info,errors={},{},{}
   local function issue(id,text,level) errors[#errors+1]={nodeId=id,text=text,level=level or "error"} end
@@ -115,15 +174,7 @@ function G.compile(g)
   for _,seq in ipairs(sequences) do
     if seq.batteries==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Battery") end
     if seq.strikers==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Striker") end
-    -- One collider's startup threshold on the shared rail, deduplicated by cost.
-    local costs,seen={},{}
-    for _,n in ipairs(seq.nodes) do
-      if n.type=="striker" then
-        local cost=G.startup(n)
-        if not seen[cost] then costs[#costs+1]=cost seen[cost]=true end
-      end
-    end
-    table.sort(costs)
+    local costs,thresholds=startupThresholds(g,seq,info)
     for _,n in ipairs(seq.nodes) do
       local p=info[n.id] p.rail=seq.rate p.capacity=seq.capacity
       p.stored=seq.initial
@@ -131,7 +182,10 @@ function G.compile(g)
       if n.type=="battery" then p.startupCosts=costs end
       if n.type=="barrel" then p.targetStrikers=targetStrikers(g,n,info) end
       p.cost=n.type=="striker" and G.startup(n) or 0
-      if p.cost>seq.capacity then issue(n.id,"Startup cost exceeds sequence capacity","warn") end
+      p.startupThreshold=thresholds[n.id]
+      if (p.startupThreshold or 0)>seq.capacity then
+        issue(n.id,"Startup cost for strike / full volley exceeds sequence capacity","warn")
+      end
       if n.type=="trigger" and not require("framework.mws.triggers").byId[n.props.subclass] then
         issue(n.id,"Unknown Trigger subclass")
       end

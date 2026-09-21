@@ -2,7 +2,7 @@
 
 **Status:** design draft; agreed rules plus explicitly identified open decisions.
 
-**Updated:** 20 September 2026.
+**Updated:** 21 September 2026.
 
 **Implementation status:** a playable v2 subset is available in the F8 bench,
 including sequence reservoirs, all Trigger subclasses, strike events and editable
@@ -97,11 +97,13 @@ may appear before or after a Barrel split:
 
 ```text
 Striker → Multi Barrel → branches
-    The striker applies to all of that barrel's branches.
+    One funded strike splits its output across the barrel's branches.
+    The children share that strike's hit count and completion.
 
 Multi Barrel → branch A → Striker A
              → branch B → Striker B
-    Each striker applies to the branch to which it is attached.
+    Each striker applies to its branch at full power.
+    The whole requested volley must be funded before any strike starts.
 ```
 
 These examples show scope, not complete valid sequences; their triggers,
@@ -255,6 +257,17 @@ count. It also qualifies for the Miss Trigger if that count is zero.
 Filling to maximum capacity is not required before firing. The threshold is the
 required startup energy. Energy is not made negative to fund a strike.
 
+For **Multi → Striker**, the startup threshold is the sum of the requested
+strikes' startup costs. Reserve that total before starting any of them. If the
+total exceeds capacity, the volley cannot start; if stored energy is too low,
+skip the entire opportunity. A hot signal retries when the full threshold is
+available. Nested Multi modules before the Striker combine into one reservation.
+
+For **Striker → Multi**, pay startup once for the original strike. The children
+divide its output energy; splitting must not create extra energy or allow each
+child to draw the original strike's full power. This division stays within the
+current sequence and does not transfer energy through events.
+
 For an isolated strike with constant D > R, the approximate duration supported
 by energy E remaining after startup is `E / (D - R)`. This assumes refill remains
 available and there are no other consumers or discrete costs. If D <= R, energy
@@ -315,7 +328,7 @@ that behavior explicitly within a graph.
 | Directional | Offset direction relative to incoming DOI. |
 | Rotating | Rotate around a point, starting at incoming DOI. |
 | Spread | Choose a random direction within a cone around incoming DOI, favouring the centre with a bell-shaped distribution. |
-| Multi | Fire simultaneously in N > 1 directions centered around incoming DOI. |
+| Multi | Fire simultaneously in N > 1 directions centered around incoming DOI. Before Striker, request a fully funded volley. After Striker, split one strike's output across the directions. |
 | Alternating | Fire round-robin through N > 1 directions centered around incoming DOI. |
 | Blind | Choose a random direction, discarding incoming DOI. |
 | Seeking | Direct toward the nearest enemy within the applicable Striker's reach. |
@@ -335,9 +348,24 @@ need definition. Other open details include circular/vector averaging, opposing
 directions, input synchronization, targeting criteria/fallbacks, refraction math,
 and how motion-modifying Barrels interact with Striker movement.
 
+### Multi ordering and output shares
+
+Each post-Striker Multi divides its incoming output equally among its N lanes.
+Nested splits divide their incoming shares again: splitting one half three ways
+creates three one-sixth shares while the unsplit sibling keeps its half. A child
+that ends does not donate its share to surviving siblings. Split children should
+look dimmer so the reduction is visible.
+
+The first implementation scales continuing movement draw and Payload energy by
+the child's share. Damage follows the funded Payload energy. It preserves speed,
+range, size, and maximum duration; this is explicit initial tuning, not a final
+physical model for energy versus reach. A three-way split therefore costs one
+startup and does one-third damage per child with otherwise identical Payloads.
+Range and damage should not receive independent automatic division penalties.
+
 ## 7. Strikers: colliders and lifecycle
 
-A Striker positions and moves a collider. It has one input and N outputs. It
+A Striker positions and moves colliders. It has one input and N outputs. It
 requires startup energy and ignores firing opportunities that cannot be funded.
 Its position relative to Barrel branches defines the scope of its behavior.
 
@@ -370,6 +398,13 @@ Miss is a Trigger predicate on Complete: `hitCount == 0`. Complete Trigger accep
 all Complete events. There is no separate launch/Fired outcome in this revision.
 If the final contact ends a strike, its Hit precedes its Complete so the final
 count includes that contact.
+
+A strike split by a downstream Multi remains one logical strike. Its children
+report Hits with a combined running hit count. Complete fires once, after the
+last child ends; Miss qualifies only if none of the children hit anything. An
+early child completion does not restart that child while the parent remains
+active. Fresh firing after the parent ends starts a new strike and a new split.
+Separate full-power strikes from an upstream Multi retain separate lifecycles.
 
 Proposed event data for implementation (field names are not a frozen API):
 
