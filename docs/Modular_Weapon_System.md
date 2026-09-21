@@ -59,8 +59,11 @@ Class/subclass declarations should remain the single source for properties,
 defaults, editor controls, and validation, following the project's existing
 schema-driven approach.
 
-Repeater is now a Trigger subclass. The old Emitter class has no decided role in
-this revision; its removal or replacement must not be inferred from its omission.
+Repeater is now a Trigger subclass. **Emitter is retired from the revised model.**
+Its former use cases are expressed through sequences: Triggers govern activation,
+Batteries supply energy, Strikers perform the work, and Payloads define effects.
+Further sequences can react to the resulting strike events. A separate Emitter
+module and its special fire-and-forget execution path are unnecessary.
 
 ## 3. Weapon graphs and sequences
 
@@ -432,8 +435,9 @@ Other migration work includes:
 
 | Current implementation | Revised design |
 |---|---|
-| Seven generic module types; properties configure most behavior. | Five described classes with configurable subclass instances; Emitter disposition open. |
+| Seven generic module types; properties configure most behavior. | Five classes with configurable subclass instances. |
 | Repeater is its own module type. | Repeater belongs to Trigger. |
+| Emitter is a separate terminal module with a fire-and-forget execution path. | Emitter is retired; its use cases are composed from sequences using the normal module and strike lifecycle rules. |
 | Single-parent forest; Barrel is the branching module. | Multi-input/output Barrels and one-input/multiple-output Strikers. |
 | Branch-local segments; energy divided across Barrel branches. | Independent sequence reservoirs; placement-independent additive batteries. |
 | Trigger/Repeater pays a precomputed downstream strike cost. | Startup and ongoing expenditures draw from stored sequence energy. |
@@ -483,8 +487,8 @@ The following are deliberately not resolved by this revision:
   deterministic payload order across branches.
 - Collider-versus-payload shape ownership, proximity sensing geometry, and the
   detailed math/state of the more complex Barrel subclasses.
-- Emitter's future, graph migration/serialization, runtime reset rules, and which
-  configuration abilities each product mode exposes.
+- Graph migration/serialization, runtime reset rules, and which configuration
+  abilities each product mode exposes.
 
 Implementation experiments should record their chosen policy rather than present
 an untested default as a settled design rule.

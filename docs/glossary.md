@@ -77,7 +77,8 @@ behavior.
 
 | Term | Meaning |
 |---|---|
-| **Module class** | A role: Trigger, Battery, Barrel, Striker, or Payload. Emitter's future is undecided. |
+| **Module class** | A role: Trigger, Battery, Barrel, Striker, or Payload. |
+| **Emitter (retired)** | An earlier module whose use cases are now expressed through sequences. The revised design has no separate Emitter module or special fire-and-forget execution path. |
 | **Module subclass** | A particular behavior within a class, such as Repeater Trigger or Sweep Striker. |
 | **Module instance** | A configured module placed in a graph, with runtime state separate from its configuration. Acquisition and editing rules depend on the game/tool mode. |
 | **Sequence** | A graph subsection requiring a Trigger, Battery, and Striker; Barrels and Payloads are optional. A Striker-to-Trigger connection starts the next sequence. |
