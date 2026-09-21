@@ -113,38 +113,79 @@ current implementation's single-parent graph restriction.
 
 ### Application boundary
 
-The application owns physical input, AI decisions, and input binding. An
-abstraction outside MWS converts application input events into a bitstream.
-Each bit represents one frame. Direction and other spatial context accompany the
-signal; they are not encoded as the firing bit.
+The application input abstraction sits **above the weapon adapter**. It owns
+device handling, bindings, AI input normalization, keyboard-repeat handling, and
+resolution of input that arrives between simulation ticks. The adapter receives
+normalized application events such as `FIRE_BUTTON_DOWN` and `FIRE_BUTTON_UP`;
+it does not interpret raw devices or reconstruct their event history.
 
-MWS consumes that signal without knowing whether it came from a player, AI, or a
-test harness. Striker events provide input to subsequent sequences. The exact
-encoding of event pulses and the choice of simulation versus rendered frames are
-open, and must be consistent for deterministic tests.
+```text
+Application input layer → normalized fire events → weapon adapter
+                       → one signal bit per simulation tick → Trigger chain
+```
+
+The adapter converts normalized down/up events into hot/cold signal state. A held
+action remains hot until release. Direction and other spatial context accompany
+the signal; they are not encoded as the firing bit. Simulation ticks, rather
+than rendered frames, determine signal evaluation.
+
+Multiple presses between ticks register **one fire press**, not a backlog of
+presses to discharge over later ticks. Short-tap recognition and same-tick
+down/up resolution belong to the input layer: it must make the one recognized
+press observable in its normalized output. Neither the adapter nor MWS adds an
+input replay queue. Keyboard repeat does not turn a held action into repeated
+presses. A discrete application activation is represented as a one-tick pulse,
+with input timing/coalescing handled by the input layer.
+
+MWS consumes the resulting signal without knowing whether it came from a player,
+AI, or test harness. Separately, downstream Hit, Miss, and Complete Triggers
+convert qualifying striker events into signals. Application press coalescing
+does not by itself define how multiple collision events in one tick are handled.
 
 **Hot** means a Trigger's current output bit is 1. **Cold** means it is 0.
 Trigger chains consume each other's output in graph order, so order matters.
-Timers, toggles, and repeaters require runtime state belonging to the appropriate
+Delays, toggles, and repeaters require runtime state belonging to the appropriate
 instance/execution context; the old blanket prohibition on module state does not
 apply.
+
+Before the first tick, previous input is treated as cold and Toggle output starts
+cold. Therefore hot input on activation produces a Single pulse and switches a
+Toggle on. Inverter → Single on an idle zero input produces one startup pulse.
+Triggers process signals independently of available battery energy.
 
 ### Trigger subclasses
 
 | Subclass | Intended behavior | Detail still to settle |
 |---|---|---|
-| Inverter | Inverts the input signal. Inverting an idle zero stream supports constant-on autofire. | The original notes' claim about chained inverters producing zeros is unresolved. Ordinary NOT alternates by parity; do not silently adopt that as the agreed chaining rule. |
-| Single | Inverts a single bit for a discrete activation, useful for projectiles or melee. | Which input transition selects the bit and how it rearms. |
-| Toggle | Changes persistent output state in response to sequence input, useful for beams. | Which transition toggles it and its initial state. |
-| Timer | Changes output after an input-started delay, useful for time bombs. | Pulse versus held output, cancellation, and retrigger/reset rules. |
-| Repeater | Emits positive pulses at a regular interval only while its input is hot. | Pulse width and cadence phase on activation. |
-| Proximity | Responds when enemies are detected inside the sequence's AOE. | Detection geometry before a strike exists and output/edge behavior. |
-| Miss | Activates on Complete only when the completed strike's `hitCount == 0`. | Event-to-bit pulse encoding follows the common event-input contract. |
-| Complete | Activates whenever a strike completes, regardless of its hit count. | Event-to-bit pulse encoding follows the common event-input contract. |
+| Inverter | Boolean NOT of the current input. Two inverters restore the original signal; an idle zero stream becomes constant-on autofire. | No outstanding basic transformation rule. |
+| Single | Emits one hot tick on a 0→1 input transition. Holding input produces no additional pulses; cold input rearms it. | No outstanding basic transformation rule. |
+| Toggle | Flips its persistent output on each 0→1 input transition. Starts cold; release leaves the output unchanged. | No outstanding basic transformation rule. |
+| Delay | Echoes all input after the configured delay, preserving the pattern and hot/cold transitions. Pending output cannot be cancelled by later input. | Delay units and rounding to simulation ticks. |
+| Repeater | While input is hot, emits an immediate first pulse followed by regular pulses. Pulse width is configurable; higher tiers support faster repetition. Going cold resets the pattern for the next activation. | Numerical tier rates and allowed pulse-width/period combinations. |
+| Proximity | Stays hot while enemies are inside the sequence's AOE, and cold when none are present. | Detection geometry before a strike exists and interaction with upstream gating. |
+| Hit | Converts qualifying Hit events into signals for a downstream sequence. | Pulse encoding and handling of multiple strike events in one tick. |
+| Miss | Converts Complete events into signals only when the completed strike's `hitCount == 0`. | Pulse encoding and handling of multiple strike events in one tick. |
+| Complete | Converts every Complete event into a signal regardless of hit count. | Pulse encoding and handling of multiple strike events in one tick. |
 
-Hit events must be available for downstream reactions. A dedicated **Hit Trigger**
-is a proposed addition to the catalog; whether that is a named subclass or an
-event selection setting remains open. Miss is not an unhandled-event fallback.
+Delay replaces the Trigger subclass previously called Timer. It reproduces the
+entire incoming pattern later, including releases; a new input does not reset
+the delay of earlier input. This intentional module delay is distinct from the
+rejected application-input backlog. The Timer **Battery** retains its name and
+separate behavior. Miss is not an unhandled-event fallback.
+
+For the same supplied signal, the basic transformations are:
+
+```text
+Input      000111001100
+Inverter   111000110011
+Single     000100001000
+Toggle     000111110000
+```
+
+Order is significant: Inverter → Single pulses on an original-input release
+(and on initial idle activation under the startup rule), whereas Single →
+Inverter stays hot except for a cold tick on an original-input press. Toggle →
+Repeater starts automatic pulses on one press and stops them on the next.
 
 ### Firing and energy availability
 
@@ -465,6 +506,14 @@ Minimum behavioral checks for the future implementation:
     placement before or after a split.
 12. Equivalent supplied input streams and seeds behave the same across player,
     AI, and test sources.
+13. Inverter, Single, and Toggle match the signal example and startup rules in
+    section 4; chained transforms consume the previous node's output in order.
+14. Delay reproduces both hot and cold transitions after the configured delay;
+    later release or retrigger does not cancel or reset earlier pending output.
+15. Repeater pulses immediately, respects configured width, and resets its
+    pattern on cold input. Proximity remains hot throughout enemy presence.
+16. Multiple application presses between simulation ticks become one press with
+    no later replay backlog. Device/timing handling stays above the adapter.
 
 These are acceptance cases for later work, not claims that tests were added or
 that the existing implementation passes them.
@@ -473,10 +522,12 @@ that the existing implementation passes them.
 
 The following are deliberately not resolved by this revision:
 
-- Trigger truth tables, inverter chaining, defaults, timer/toggle reset rules,
-  repeater pulse width, and event-to-bit conversion.
-- Simulation-frame timing and deterministic handling of multiple events in a
-  frame; whether Hit is a subclass or a selectable event condition.
+- Delay resolution/rounding, numerical Repeater tier rates, and allowed pulse
+  width/period combinations.
+- Exact normalized input API for same-tick transitions (owned by the application
+  input layer); Hit/Miss/Complete signal pulse encoding and deterministic handling
+  of multiple strike events in a tick. Application presses already coalesce to
+  one press per tick with no replay backlog.
 - Initial reservoir charge and exact Instant/Infinite/Ammo/Constant/Timer
   behavior within the reservoir model.
 - Energy formulas, discrete versus continuous charging, spending order, shared

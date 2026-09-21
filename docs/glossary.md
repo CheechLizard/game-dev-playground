@@ -87,7 +87,16 @@ behavior.
 | **Fill rate (R)** | Energy replenished per second while allowed by the battery subclass. |
 | **Stored energy (E)** | The reservoir's current spendable energy, between zero and capacity. |
 | **Battery tier** | Trash, common, rare, legendary, or celestial; affects both capacity and fill rate. Numerical scaling is open. |
-| **Input bitstream** | One bit per frame, supplied through the external input abstraction or derived from upstream striker events. Exact frame/event encoding remains open. |
+| **Application input layer** | Owns devices, bindings, repeats, and between-tick timing above the weapon adapter. Multiple presses between ticks register one press; no replay backlog is created. |
+| **Weapon input adapter** | Converts normalized events such as `FIRE_BUTTON_DOWN` and `FIRE_BUTTON_UP` into firing signal state; does not handle raw devices or buffer input history. |
+| **Input bitstream** | One bit per simulation tick. Application signals come through the input adapter; Hit/Miss/Complete Triggers convert upstream striker events into signals. |
+| **Inverter Trigger** | Boolean NOT. Two inverters restore their input; idle zero input becomes constant-hot output. |
+| **Single Trigger** | One hot tick on each 0→1 input transition; cold input rearms it. Previous input starts cold. |
+| **Toggle Trigger** | Starts cold and flips output on each 0→1 input transition; release leaves its output unchanged. |
+| **Delay Trigger** | Echoes the entire input pattern after a configured delay, including releases. Pending output cannot be cancelled. Replaces the Timer Trigger, not the Timer Battery. |
+| **Repeater Trigger** | Pulses immediately while input is hot, with configurable pulse width and faster repetition at higher tiers. Cold input resets the pattern. |
+| **Proximity Trigger** | Stays hot while enemies are present inside the sequence's AOE. |
+| **Hit Trigger** | Converts qualifying Hit events into signals for a subsequent sequence. |
 | **Hot / cold** | Trigger output 1 / 0. A hot output can start a new strike whenever startup energy is available, including after exhaustion and refill. |
 | **DOI** | Direction of input. Barrels transform and route it in order. Without a Barrel, firing direction is random and ignores it. |
 | **Startup cost** | Energy required to start one strike. Above capacity it can never start; above current stored energy the firing opportunity is skipped. |

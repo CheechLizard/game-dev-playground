@@ -29,10 +29,15 @@
   <path d="M 850 187 H 910" class="powerline"/><text x="926" y="194" class="small">Energy</text>
   <path d="M 850 226 H 910" class="eventline"/><text x="926" y="233" class="small">Strike events</text>
 
-  <!-- Root input is acquired outside MWS. Direction remains separate from bits. -->
+  <!-- The input layer normalizes devices and timing above the adapter. -->
+  <rect x="50" y="154" width="300" height="100" rx="14" class="box"/>
+  <text x="200" y="192" text-anchor="middle" class="name">Input layer</text>
+  <text x="200" y="228" text-anchor="middle" class="small">Devices · timing · coalescing</text>
+  <path d="M 350 205 H 469" class="line"/>
+  <text x="410" y="183" text-anchor="middle" class="small">events</text>
   <rect x="470" y="154" width="330" height="100" rx="14" class="box"/>
   <text x="635" y="192" text-anchor="middle" class="name">Application adapter</text>
-  <text x="635" y="228" text-anchor="middle" class="small">Player · AI · test input</text>
+  <text x="635" y="228" text-anchor="middle" class="small">Normalized fire down / up</text>
 
   <rect x="40" y="289" width="1320" height="801" rx="22" fill="#edf3f7" stroke="#bdccd6" stroke-width="2"/>
   <text x="70" y="325" class="section">SEQUENCE A</text>
@@ -40,7 +45,7 @@
 
   <path d="M 635 254 V 349" class="line"/>
   <text x="653" y="282" class="label">frame bits</text>
-  <path d="M 470 205 H 415 V 515 H 220 V 569" class="line"/>
+  <path d="M 500 254 V 272 H 415 V 515 H 220 V 569" class="line"/>
   <text x="249" y="495" class="label">incoming DOI</text>
 
   <rect x="470" y="350" width="430" height="120" rx="14" class="box"/>
@@ -109,8 +114,8 @@
   <path d="M 730 1369 V 1424" class="eventline"/>
   <path d="M 1110 1369 V 1424" class="eventline"/>
   <rect x="90" y="1425" width="355" height="110" rx="14" class="box"/>
-  <text x="267" y="1465" text-anchor="middle" class="name">Hit reaction</text>
-  <text x="267" y="1503" text-anchor="middle" class="small">Trigger form still to be defined</text>
+  <text x="267" y="1465" text-anchor="middle" class="name">Hit Trigger</text>
+  <text x="267" y="1503" text-anchor="middle" class="small">Convert qualifying hits to signals</text>
   <rect x="530" y="1425" width="355" height="110" rx="14" class="box"/>
   <text x="707" y="1465" text-anchor="middle" class="name">Miss Trigger</text>
   <text x="707" y="1503" text-anchor="middle" class="body">Only if hitCount = 0</text>
