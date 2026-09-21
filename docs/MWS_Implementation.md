@@ -12,6 +12,11 @@ Run `love .` from `~/Dev/game-dev-playground/main`, then press **F8**.
 The first six bench weapons are v2 prototypes; **comma / period** cycles weapons.
 The editor's **Levels → Bench → Prototype** setting also selects them.
 
+Bench enemies stay still by default so weapon movement is visible. Their AI,
+separation and knockback are paused; hit detection, damage and replacement of
+defeated targets still work. Disable **Levels → Bench → Dummies hold still** for
+moving enemies. The survival game is unaffected.
+
 - **Z** or **controller X** supplies fire input. **Fire pulse** supplies one
   pulse; **Hold fire** supplies continuous input. Turn Hold fire off when testing
   individual presses. WASD/arrows/controller stick move the player.
@@ -131,10 +136,11 @@ Hit/Miss/Complete routing, shared energy across event contexts, delayed position
 Barrel scope, JSON round-trips and game-host integration. Legacy tests remain.
 `luajit tools/balance.lua --runs 1 --seconds 180` compares the survival baseline.
 
-Reproducible visual checks:
+Reproducible visual checks use the Lua screenshot tool; no accessibility access
+is needed. Add `--frames 4 --every 0.5` to inspect several moments in one run:
 
 ```sh
-tools/capture.sh /tmp/mws-pulse.png --mode bench --at 4 --seed 7 --set bench.holdFire=true
-tools/capture.sh /tmp/mws-beam.png --mode bench --at 0.5 --seed 7 --set bench.prototype=v2_beam --set bench.holdFire=true
-tools/capture.sh /tmp/mws-complete.png --mode bench --at 3 --seed 7 --set bench.prototype=v2_complete --set bench.holdFire=true
+luajit tools/screenshot.lua /tmp/mws-pulse.png --mode bench --at 4 --seed 7 --set bench.holdFire=true
+luajit tools/screenshot.lua /tmp/mws-beam.png --mode bench --at 0.5 --seed 7 --set bench.prototype=v2_beam --set bench.holdFire=true
+luajit tools/screenshot.lua /tmp/mws-complete.png --mode bench --at 3 --seed 7 --set bench.prototype=v2_complete --set bench.holdFire=true
 ```

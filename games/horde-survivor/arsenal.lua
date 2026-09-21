@@ -316,9 +316,9 @@ function arsenal.registerSettings(schema)
           return ids
         end)() },
       { key = "bench.dummyStill", label = "Dummies hold still", type = "bool",
-        default = false,
-        help = "On, they stand there and take it, which is what you want when "
-          .. "reading damage numbers rather than watching a fight." },
+        default = true,
+        help = "Stationary targets: no AI movement, attacks, crowd separation or knockback. "
+          .. "Turn off to test normal enemy behavior." },
     },
   }
 end

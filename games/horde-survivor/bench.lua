@@ -82,7 +82,9 @@ local function mwsWeapons()
 end
 
 function bench.new()
-  local r = runModule.new(os.time())
+  -- Capture seeds LÖVE's generator, making targets reproducible across runs.
+  local seed=(love and love.math and love.math.random(1,2147483646)) or os.time()
+  local r = runModule.new(seed)
   r.sandbox = true
   r.player.invulnerable = true
   r.arenaW, r.arenaH = config.values.render.width, config.values.render.height
@@ -166,8 +168,9 @@ function bench.update(s, dt, moveX, moveY)
   r.player.hp = r:playerStat("maxHp")
   r.state = runModule.STATE.PLAYING
 
-  -- Dummies are ordinary enemies running the ordinary behaviour, or the bench
-  -- would be measuring something the game never does.
+  -- The host freezes dummy AI/motion before collision checks, not after they
+  -- have already moved. Combat and hit effects continue normally.
+  r.stationaryEnemies=c.bench.dummyStill
   local target = math.max(0, math.floor(c.bench.population))
   s.spawnTimer = s.spawnTimer - dt
   if s.spawnTimer <= 0 and #r.enemies < target then
@@ -187,9 +190,6 @@ function bench.update(s, dt, moveX, moveY)
     end
   else r.fireSignal=nil r:update(dt, moveX, moveY) end
 
-  if c.bench.dummyStill then
-    for _, e in ipairs(r.enemies) do e.vx, e.vy = 0, 0 end
-  end
   for _, e in ipairs(r.enemies) do
     e.x = math.max(e.radius, math.min(r.arenaW - e.radius, e.x))
     e.y = math.max(e.radius, math.min(r.arenaH - e.radius, e.y))

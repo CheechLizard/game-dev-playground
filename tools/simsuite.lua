@@ -196,6 +196,34 @@ function sim.run(suite, check, eq, near)
       table.concat(missing, ", "))
   end
 
+  suite("simulation: stationary bench targets")
+  do
+    eq("bench targets default to stationary",config.get("bench.dummyStill"),true)
+    local r=runModule.new(7)
+    r.sandbox=true r.stationaryEnemies=true r.player.invulnerable=true
+    r.player.weapons={}
+    local targets={}
+    for _,def in ipairs(require("content").enemies) do
+      local e=r:spawnEnemy(def.id,50+#targets,50)
+      e.vx,e.vy=200,-150
+      targets[#targets+1]={enemy=e,x=e.x,y=e.y}
+    end
+    local victim=targets[1].enemy local hp=victim.hp
+    r:damageEnemy(victim,0.1,"blaster",100,100,0)
+    for _=1,180 do r:update(1/60,0,0) end
+    for _,t in ipairs(targets) do
+      near(t.enemy.id.." stays at its original x",t.enemy.x,t.x)
+      near(t.enemy.id.." stays at its original y",t.enemy.y,t.y)
+      near(t.enemy.id.." reports zero motion for aiming",t.enemy.vx^2+t.enemy.vy^2,0)
+    end
+    check("stationary targets still take damage",victim.hp<hp)
+    eq("stationary targets do not fire enemy shots",#r.enemyShots,0)
+    local oldX=victim.x
+    r.stationaryEnemies=false
+    for _=1,30 do r:update(1/60,0,0) end
+    check("disabling stationary mode restores normal movement",victim.x~=oldX)
+  end
+
   suite("simulation: scaling")
   do
     local s1 = runModule.waveScale(1, 1)

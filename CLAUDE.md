@@ -37,7 +37,7 @@ is the main merge-conflict hotspot when branches run in parallel.
 love .                       # run — from the repo root, never a subdirectory
 luajit tools/test.lua        # 132 tests, ~5s
 luajit tools/balance.lua --runs 6
-tools/capture.sh hud.png --at 8 --seed 7    # screenshot, ~1s
+luajit tools/screenshot.lua hud.png --at 8 --seed 7
 ```
 
 **`love .` only works from the repo root.** `love games/horde-survivor` fails:
@@ -62,12 +62,19 @@ inspection levels.
 
 ## Seeing the game
 
-**You can look at the game.** `tools/capture.sh <out.png> [flags]` drives it
+**Do not request or use accessibility control of the user's machine.** Capture
+the game's own frame through Lua. No desktop automation is needed for this project.
+
+**You can look at the game.** `luajit tools/screenshot.lua <out.png> [flags]` drives it
 from the command line and writes a PNG in about a second — no window to sit in
 front of, nothing to ask the user to do. Any drawn surface is reachable:
 `--mode zoo|range`, `--editor <page>`, `--do "<editor action label>"`,
 `--press <input action>`, `--set <schema key>=<value>`, `--overlays`, `--perf`.
 The README has the full list.
+
+Use `--frames 4 --every 0.5` to inspect a series from the same simulation.
+The Lua launcher uses direct process arguments, enforces a timeout and verifies
+each PNG. `tools/capture.sh` remains a single-shot convenience.
 
 Take one after any change to a drawn surface and *look at it*. The tests cover
 the simulation and cannot see a widget drawn at the wrong scale, text

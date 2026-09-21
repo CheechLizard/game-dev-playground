@@ -232,6 +232,14 @@ do
   eq("path survives", plan.path, "captures/a.png")
   eq("default warm-up", plan.at, 2)
   eq("does not hold by default", plan.hold, false)
+  eq("single captures preserve the requested filename",capture.outputPath(plan,1),"captures/a.png")
+  local series=capture.parse({"--capture","/tmp/beam.png","--frames","4","--every","0.2"})
+  eq("series uses ordered output filenames",capture.outputPath(series,3),"/tmp/beam-003.png")
+  eq("series preserves frame count",series.frames,4)
+  near("series interval follows simulation ticks",series.every,12/60)
+  check("fractional frame count is refused",not capture.parse({"--capture","a","--frames","1.5"}))
+  check("unbounded frame count is refused",not capture.parse({"--capture","a","--frames","121"}))
+  check("sub-tick intervals are refused",not capture.parse({"--capture","a","--every","0.001"}))
 
   eq("bare name lands in captures/",
     capture.parse({ "--capture", "hud" }).path, "captures/hud.png")

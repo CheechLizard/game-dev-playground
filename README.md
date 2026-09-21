@@ -17,7 +17,7 @@ love .                      # run the default game
 love . --game horde-survivor
 luajit tools/test.lua       # headless tests (no LÖVE needed)
 luajit tools/balance.lua --runs 5
-tools/capture.sh hud.png    # screenshot, no hands on the keyboard
+luajit tools/screenshot.lua hud.png    # screenshot through the game's Lua renderer
 ```
 
 Run from the repo root. That matters: config profiles are written back into
@@ -66,26 +66,35 @@ live here rather than on top of the game.
 Nothing here is loaded from an image file; every pixel is drawn, and every
 editor surface is generated from the schema. So "does this look right?" can
 only be answered by looking — which is a problem for anyone working without a
-screen in front of the game. `--capture` is the answer: it drives the game from
-the command line and writes a PNG.
+screen in front of the game. The Lua screenshot tool drives the game's own
+renderer and writes PNGs, with no accessibility permission or desktop control.
 
 ```
-tools/capture.sh hud.png --at 8 --seed 7
-tools/capture.sh editor.png --editor Debug
-tools/capture.sh zoo.png --mode zoo --press next --press next
-tools/capture.sh shop.png --do "+100 gold" --do "Open shop"
+luajit tools/screenshot.lua hud.png --at 8 --seed 7
+luajit tools/screenshot.lua editor.png --editor Debug
+luajit tools/screenshot.lua zoo.png --mode zoo --press next --press next
+luajit tools/screenshot.lua beam.png --mode bench --seed 7 --at 0.5 --frames 4 --every 0.5 --set bench.prototype=v2_beam --set bench.holdFire=true
 ```
 
 The run settles for a few frames so the window is real, fast-forwards the
 simulation in fixed 1/60 steps, applies what the flags asked for, draws one
 frame, writes the PNG and quits — under a second, even for a long warm-up.
 Nothing else moves: the simulation is frozen except for the warm-up, so the
-same command line produces a byte-identical PNG every time.
+same seeded command line produces a byte-identical PNG every time. A series
+advances that same simulation between snapshots and writes `beam-001.png`,
+`beam-002.png`, etc. Application presses are not replayed between shots.
+
+The launcher runs on macOS/Linux with LuaJIT and LÖVE installed. It verifies every
+PNG and stops a failed/hung capture after 60 seconds. `LOVE_BIN` can select the
+LÖVE executable; `SCREENSHOT_TIMEOUT` changes that timeout. The existing
+`tools/capture.sh` single-shot command and in-game F7 shortcut still work.
 
 | Flag | |
 |---|---|
 | `--capture <path>` | where the PNG goes; a bare name lands in `captures/` |
 | `--at <seconds>` | simulated seconds to fast-forward before the shot (default 2) |
+| `--frames <n>` | capture 1–120 frames from the same simulation (default 1) |
+| `--every <seconds>` | simulated interval between captures, rounded to 60 Hz ticks (default 0.5) |
 | `--seed <n>` | pins the run and LÖVE's generator, making the shot reproducible |
 | `--mode run\|zoo\|range\|bench` | which level |
 | `--profile <name>` | load a config profile first |
@@ -181,8 +190,13 @@ built-in until you revert — the same bargain a profile makes with the schema.
 `F8`. The weapon-graph editor, built as a level rather than a panel so you can
 watch the thing you are editing actually fire.
 
-The player stands in an arena across the top of the screen shooting dummies;
-the graph is a flowchart underneath. Each module is a 48px tile with an icon;
+The player stands in an arena across the top of the screen shooting dummies.
+Bench targets stay still by default, including against knockback; their AI and
+attacks are paused while collisions and damage remain active. Disable
+**Levels → Bench → Dummies hold still** to restore normal enemy behavior.
+This setting only affects the bench.
+
+The graph is a flowchart underneath. Each module is a 48px tile with an icon;
 clicking one fills the inspector on the right with its properties, drawn with
 the editor's own widgets. There is no apply step — the run is holding the same
 table the canvas is drawing, so a slider moves and the next shot is different.

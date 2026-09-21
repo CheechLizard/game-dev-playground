@@ -32,6 +32,8 @@ local phase = "idle"        -- settle -> warm -> ready -> shooting -> done
 local settled = 0
 local queue = {}            -- paths waiting for a frame
 local inflight = 0          -- shots handed to LÖVE, not yet written
+local frameIndex = 1
+local failed = false
 
 capture.status = nil        -- last human-readable result
 
@@ -52,6 +54,7 @@ end
 function capture.parse(args)
   local p = {
     at = DEFAULT_AT, sets = {}, actions = {}, presses = {}, hold = false,
+    frames = 1, every = 0.5,
   }
   local i = 1
   while args and args[i] do
@@ -72,6 +75,21 @@ function capture.parse(args)
       local n = tonumber(v)
       if not n or n < 0 then return nil, "--at needs a number of seconds" end
       p.at = n
+    elseif a == "--frames" or a == "--every" then
+      local v,err=value()
+      if not v then return nil,err end
+      local n=tonumber(v)
+      if a=="--frames" then
+        if not n or n~=math.floor(n) or n<1 or n>120 then
+          return nil,"--frames needs an integer from 1 to 120"
+        end
+        p.frames=n
+      else
+        if not n or n~=n or n<1/60 or n>600 then
+          return nil,"--every needs seconds between 1/60 and 600"
+        end
+        p.every=math.floor(n*60+0.5)/60
+      end
     elseif a == "--seed" then
       local v, err = value()
       if not v then return nil, err end
@@ -81,7 +99,7 @@ function capture.parse(args)
     elseif a == "--mode" then
       local v, err = value()
       if not v then return nil, err end
-      if not MODES[v] then return nil, "--mode must be run, zoo or range" end
+      if not MODES[v] then return nil, "--mode must be run, zoo, range or bench" end
       p.mode = v
     elseif a == "--profile" then
       local v, err = value()
@@ -122,7 +140,7 @@ function capture.parse(args)
     -- Catch the flags that only mean something alongside --capture rather
     -- than silently ignoring a command line that asked for a screenshot.
     for _, flag in ipairs({ "--at", "--seed", "--mode", "--set", "--do",
-        "--press", "--editor", "--overlays", "--perf", "--hold" }) do
+        "--press", "--editor", "--overlays", "--perf", "--hold", "--frames", "--every" }) do
       for _, a in ipairs(args or {}) do
         if a == flag then
           return nil, flag .. " only means something with --capture"
@@ -135,6 +153,12 @@ function capture.parse(args)
   if not p.path:match("%.png$") then p.path = p.path .. ".png" end
   if not p.path:match("[/\\]") then p.path = capture.dir .. "/" .. p.path end
   return p
+end
+
+-- One capture keeps the requested filename; a series uses ordered PNG names.
+function capture.outputPath(p,index)
+  if p.frames==1 then return p.path end
+  return p.path:gsub("%.png$",string.format("-%03d.png",index))
 end
 
 --- Turn a --set string into a value of the type the schema declares. Strings
@@ -200,6 +224,7 @@ function capture.begin(args, ctx)
   if not parsed then return end
   plan = parsed
   phase = "settle"
+  settled,frameIndex,failed=0,1,false
 
   local config, schema = ctx.config, ctx.schema
   local game = ctx.game
@@ -272,6 +297,11 @@ end
 -- first update after the window has settled, and is a no-op otherwise.
 -- `step` advances the game by a fixed dt.
 function capture.advance(step, ctx)
+  if phase=="interval" then
+    phase="ready"
+    for _=1,math.floor(plan.every*60+0.5) do step(FIXED_DT) end
+    return true
+  end
   if phase ~= "warm" then return false end
   phase = "ready"
 
@@ -308,6 +338,7 @@ end
 local function write(path, imageData)
   local ok, encoded = pcall(imageData.encode, imageData, "png")
   if not ok then
+    failed=true
     note("could not encode " .. path .. ": " .. tostring(encoded))
     return
   end
@@ -319,6 +350,7 @@ local function write(path, imageData)
       or ("wrote " .. path .. " to the save directory (" ..
         love.filesystem.getSaveDirectory() .. ")"))
   else
+    failed=true
     note("could not write " .. path .. ": " .. tostring(where))
   end
 end
@@ -331,11 +363,16 @@ function capture.afterDraw()
       settled = settled + 1
       if settled >= SETTLE_FRAMES then phase = "warm" end
     elseif phase == "ready" then
-      capture.shot(plan.path)
+      capture.shot(capture.outputPath(plan,frameIndex))
       phase = "shooting"
     elseif phase == "shooting" and inflight == 0 and #queue == 0 then
-      phase = "done"
-      if not plan.hold then love.event.quit() end
+      if not failed and frameIndex<plan.frames then
+        frameIndex=frameIndex+1
+        phase="interval"
+      else
+        phase = "done"
+        if not plan.hold then love.event.quit(failed and 1 or 0) end
+      end
     end
   end
 

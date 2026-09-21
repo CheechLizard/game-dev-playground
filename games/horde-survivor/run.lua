@@ -629,7 +629,7 @@ function run:damageEnemy(enemy, amount, weaponId, kx, ky, critOverride)
     end
   end
 
-  if kx and ky and enemy.knockback > 0 then
+  if not self.stationaryEnemies and kx and ky and enemy.knockback > 0 then
     enemy.vx = enemy.vx + kx * enemy.knockback
     enemy.vy = enemy.vy + ky * enemy.knockback
   end
@@ -780,7 +780,9 @@ function run:updateEnemies(dt)
       e.hitFlash = math.max(0, e.hitFlash - dt)
       local key = "enemy." .. e.id .. "."
 
-      if e.behaviour == "chase" then
+      if self.stationaryEnemies then
+        e.vx,e.vy=0,0
+      elseif e.behaviour == "chase" then
         seekPlayer(e, p, e.speed, dt)
 
       elseif e.behaviour == "shoot" then
@@ -867,6 +869,7 @@ end
 --- Push overlapping enemies apart so packs spread into a ring rather than
 -- stacking into a single high-damage point. One relaxation pass is enough.
 function run:separateEnemies(dt)
+  if self.stationaryEnemies then return end
   local enemies = self.enemies
   local n = #enemies
   if n < 2 then return end
