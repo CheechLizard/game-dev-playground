@@ -1077,7 +1077,11 @@ function run:updateWeapons(dt)
       -- because a paid-for strike is paid for whether or not it finds a
       -- target. Releasing when the arena empties is the honest version of the
       -- old system's "retry soon if nothing was in range".
-      weapon.mws:setFiring(#self.enemies > 0)
+      -- The game's autonomous input policy supplies a normalized action.
+      -- Device timing/coalescing belongs above this weapon boundary, never
+      -- in MWS. The legacy graph's cadence is unchanged during migration.
+      weapon.mws:inputEvent(#self.enemies > 0
+        and "FIRE_BUTTON_DOWN" or "FIRE_BUTTON_UP")
       weapon.mws:update(dt)
     elseif weapon.def.kind == "orbit" then
       self:updateOrbit(weapon, dt)

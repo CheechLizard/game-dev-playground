@@ -1,4 +1,6 @@
--- MWS module types: the single source of truth for what a module *is*.
+-- Legacy graph module types: the single source of truth for v1 graph properties.
+-- v2 Trigger primitive declarations live in mws/triggers.lua until the graph
+-- and editor migrate together; see docs/MWS_Implementation.md.
 --
 -- A weapon graph has variable topology, so a node's properties cannot be
 -- schema settings -- `schema.register` needs a fixed key, and node 7's fire

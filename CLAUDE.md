@@ -92,7 +92,8 @@ change are a real before/after.
   hand-edit the JSON — open the bench.
 - **Where MWS departs from the specification, say so in the comment.** The
   revised design is local: `docs/Modular_Weapon_System.md`. It explicitly marks
-  open decisions and is not yet implemented. The current code was built from
+  open decisions; `docs/MWS_Implementation.md` tracks the partial migration.
+  The legacy graph code was built from
   `ShmupRouge/Love2D/docs/entities/Modular_Weapon_System.md`; its original
   departures include barrel `routing`, barrel `aimMode`, and the segment rule
   for energy. Do not mistake those legacy rules for the revised sequence model.

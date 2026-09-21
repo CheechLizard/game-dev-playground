@@ -4,9 +4,11 @@
 
 **Updated:** 20 September 2026.
 
-**Implementation status:** the game currently implements an earlier model. This
-document specifies the revised design; it does not claim that the runtime or
-editor already implements it.
+**Implementation status:** migration has started with a normalized input adapter
+and tested Trigger primitives. The running graph, energy model, and editor still
+use the earlier model. See [implementation status](MWS_Implementation.md) for
+available APIs, prototype choices, and remaining stages. This document specifies
+the target design, not a claim of full implementation.
 
 This is the local successor to the v1.1 specification at
 `/Users/joewheeler/Dev/ShmupRouge/Love2D/docs/entities/Modular_Weapon_System.md`.
@@ -467,10 +469,11 @@ authoring integrates with player-facing modes need a separate implementation pla
 
 ## 10. Implementation changes and verification cases
 
-The current runtime is already separated from direct hardware reads, but accepts
-a firing flag and contains player-specific Trigger conditions. The host game
-currently sets that flag from enemy presence. The revised application adapter
-must supply the agreed source-independent signal contract.
+The current runtime is separated from direct hardware reads and now accepts
+normalized fire events through the input adapter. It still contains legacy
+player-specific Trigger conditions. The host game supplies fire-down/up based
+on enemy presence. Full application input normalization and live v2 Trigger
+execution remain migration work; see [implementation status](MWS_Implementation.md).
 
 Other migration work includes:
 

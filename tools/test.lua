@@ -297,6 +297,14 @@ end
 
 -- ------------------------------------------------------------------- mws
 
+local triggersOk, triggersErr = pcall(function()
+  require("tools.triggersuite").run(suite, check, eq)
+end)
+if not triggersOk then
+  suite("mws v2 triggers")
+  check("trigger suite completed", false, triggersErr)
+end
+
 local mwsOk, mwsErr = pcall(function()
   local mwssuite = require("tools.mwssuite")
   mwssuite.run(suite, check, eq, near)

@@ -1,4 +1,5 @@
--- Conformance tests for the Modular Weapon System.
+-- Conformance tests for the legacy MWS graph/runtime. v2 Trigger signal
+-- conformance lives in tools/triggersuite.lua during the staged migration.
 --
 -- These check the specification's *rules*, not the game's feel: that a module
 -- accepts one input, that energy divides at a branch, that a projectile's
@@ -80,6 +81,31 @@ function mwssuite.run(suite, check, eq, near)
   -- The game bolts extra properties onto the framework's modules; the suite
   -- needs them registered before it builds anything.
   require("arsenal").registerModules()
+
+  suite("mws: normalized input integration")
+  do
+    local g = graph.new("normalized-input")
+    chain(g, {
+      { "trigger", { condition = "player_hold" } },
+      { "battery", { energyPerSecond = 100 } },
+      { "striker", { baseSpeed = 0 } }, { "payload" },
+    })
+    local log = recorder()
+    local rt = runtime.new(g, log.host, { cost = cost })
+    check("runtime accepts a normalized down event", rt:inputEvent("FIRE_BUTTON_DOWN"))
+    rt:update(1 / 60)
+    eq("normalized input reaches the live graph", #log.spawned, 1)
+    rt:inputEvent("FIRE_BUTTON_DOWN")
+    rt:update(1 / 60)
+    eq("repeated down does not retrigger a held legacy window", #log.spawned, 1)
+    rt:inputEvent("FIRE_BUTTON_UP")
+    rt:update(1 / 60)
+    eq("normalized release stops an attached non-durable strike", #log.despawned, 1)
+    rt:inputEvent("FIRE_BUTTON_DOWN")
+    rt:update(1 / 60)
+    eq("a later press can start another strike", #log.spawned, 2)
+    check("runtime refuses an unrecognized device event", not rt:inputEvent("mouse1"))
+  end
 
   -- ================================================== graph structure
   suite("mws: graph structure")

@@ -6,8 +6,9 @@ and config profiles.
 
 The revised [Modular Weapon System specification](docs/Modular_Weapon_System.md)
 and its [module interaction flow chart (SVG)](docs/diagrams/modular-weapon-system.svg)
-describe the next design. The current runtime and bench still implement the
-earlier model; the specification distinguishes agreed rules from open decisions.
+describe the next design. [Implementation has begun](docs/MWS_Implementation.md)
+with the input adapter and Trigger primitives; the graph runtime and bench still
+use the earlier model. The specification separates agreed rules from open decisions.
 
 ```
 love .                      # run the default game

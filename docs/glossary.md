@@ -69,11 +69,12 @@ retired, update it here too.
 ## Modular Weapon System
 
 The revised design is in [Modular Weapon System v2.0](Modular_Weapon_System.md).
-The runtime still implements the earlier ShmupRouge specification. The two
-vocabularies are separated below so design changes are not mistaken for shipped
-behavior.
+The graph runtime still implements the earlier ShmupRouge specification, with
+the new input boundary integrated. New Trigger primitives are available separately;
+see [implementation status](MWS_Implementation.md). The two vocabularies are
+separated below so design changes are not mistaken for shipped behavior.
 
-### Revised design (not yet implemented)
+### Revised design (partially implemented)
 
 | Term | Meaning |
 |---|---|

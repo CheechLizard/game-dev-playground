@@ -1,4 +1,7 @@
 -- Running a weapon graph: strike state, events, domains and energy.
+-- This is the legacy v1 execution model with the new normalized input port.
+-- v2 sequence power and Trigger execution are not integrated yet; see
+-- docs/MWS_Implementation.md.
 --
 -- The runtime walks the graph and decides *what* should happen. It never
 -- simulates anything: when a STRIKER fires, the runtime hands the host game a
@@ -23,6 +26,7 @@
 
 local mods = require("framework.mws.modules")
 local graph = require("framework.mws.graph")
+local inputAdapter = require("framework.mws.input")
 
 local runtime = {}
 runtime.__index = runtime
@@ -144,6 +148,7 @@ function runtime.new(g, host, opts)
     costFn = opts.cost,
     modifier = opts.modifier,
     buffer = opts.buffer or 2,
+    input = inputAdapter.new(),
     firing = false,
     wasFiring = false,
     time = 0,
@@ -178,8 +183,15 @@ function runtime:rebuild()
   end
 end
 
+--- Normalized events from the application's input abstraction.
+function runtime:inputEvent(event)
+  return self.input:handle(event)
+end
+
+--- Compatibility for existing callers while graphs migrate to v2 signals.
 function runtime:setFiring(firing)
-  self.firing = firing and true or false
+  return self:inputEvent(firing and inputAdapter.FIRE_BUTTON_DOWN
+    or inputAdapter.FIRE_BUTTON_UP)
 end
 
 local function rand(self)
@@ -650,6 +662,7 @@ end
 -- ------------------------------------------------------------------- update
 
 function runtime:update(dt)
+  self.firing = self.input:sample() == 1
   self.time = self.time + dt
   self.stalled = false
 
