@@ -322,6 +322,45 @@ function tests.run(suite,check,eq,near)
         eq("a page below the original viewport can be selected",editor.page,"Page 20")
       end
     end
+    suite("ui: live module icons")
+    do
+      local u,frame,font=fixture()
+      local oldUI,oldFonts=package.loaded["framework.ui"],package.loaded["framework.fonts"]
+      package.loaded["framework.ui"]=u
+      package.loaded["framework.fonts"]={get=function() return font end}
+      local flow=dofile("shared/framework/mws/flowchart.lua")
+      package.loaded["framework.ui"],package.loaded["framework.fonts"]=oldUI,oldFonts
+      local boxes,lines,polygons={},{},{}
+      love.graphics.rectangle=function(mode,x,y,w,h) boxes[#boxes+1]={mode=mode,x=x,y=y,w=w,h=h} end
+      love.graphics.line=function(...) lines[#lines+1]={...} end
+      love.graphics.polygon=function(mode,...) polygons[#polygons+1]=mode end
+      local function battery(energy,capacity,cost)
+        boxes,lines={},{}
+        flow.icon("battery",0,0,10,{stored=energy,capacity=capacity,startupCosts={cost}})
+        for _,box in ipairs(boxes) do
+          if box.mode=="fill" and math.abs(box.w-6.8)<0.001 then return box end
+        end
+      end
+      eq("empty battery has no charge fill",battery(0,10,5),nil)
+      local half=battery(5,10,5)
+      near("half charge fills half the battery",half.h,5.2)
+      near("startup tick aligns with equal stored energy",lines[1][2],half.y)
+      local full=battery(10,10,5)
+      near("full battery fills the entire interior",full.h,10.4)
+      near("battery fill rises from a fixed bottom",full.y+full.h,half.y+half.h)
+      eq("zero-capacity battery stays empty",battery(0,0,5),nil)
+      eq("unreachable cost uses an above-capacity chevron",#lines[1],6)
+      local G=require("framework.mws.graph") local g=G.newV2("live-ui")
+      local t=G.addNode(g,"trigger",10,10) local view=flow.newView() view.selected=t.id
+      local info={[t.id]={hot=0,sequence=1,capacity=10}}
+      local function draw() polygons={} flow.draw(view,g,0,0,600,300,{info=info}) end
+      local labels=frame(400,250,false,draw)
+      local cold=false for _,label in ipairs(labels) do if label.text=="COLD" then cold=true end end
+      check("selected cold trigger remains hollow and labelled cold",cold and polygons[1]=="line")
+      info[t.id].hot=1 labels=frame(400,250,false,draw)
+      local hot=false for _,label in ipairs(labels) do if label.text=="HOT" then hot=true end end
+      check("hot trigger is filled and labelled hot",hot and polygons[1]=="fill")
+    end
     suite("ui: weapon graph editing")
     do
       local u,frame,font=fixture()

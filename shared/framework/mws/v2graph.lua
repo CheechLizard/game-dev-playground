@@ -96,8 +96,20 @@ function G.compile(g)
   for _,seq in ipairs(sequences) do
     if seq.batteries==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Battery") end
     if seq.strikers==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Striker") end
+    -- One collider's startup threshold on the shared rail, deduplicated by cost.
+    local costs,seen={},{}
+    for _,n in ipairs(seq.nodes) do
+      if n.type=="striker" then
+        local cost=G.startup(n)
+        if not seen[cost] then costs[#costs+1]=cost seen[cost]=true end
+      end
+    end
+    table.sort(costs)
     for _,n in ipairs(seq.nodes) do
       local p=info[n.id] p.rail=seq.rate p.capacity=seq.capacity
+      p.stored=seq.initial
+      if n.type=="trigger" then p.hot=0 end
+      if n.type=="battery" then p.startupCosts=costs end
       p.cost=n.type=="striker" and G.startup(n) or 0
       if p.cost>seq.capacity then issue(n.id,"Startup cost exceeds sequence capacity","warn") end
       if n.type=="trigger" and not require("framework.mws.triggers").byId[n.props.subclass] then

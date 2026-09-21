@@ -46,6 +46,64 @@ local function downstream(g,parent,sub,capacity)
 end
 
 function tests.run(suite,check,eq,near)
+  suite("mws v2: live module telemetry")
+  do
+    local g,t,b=fixture("inverter","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},
+      striker={startupCost=5}})
+    local r=world(g)
+    eq("trigger starts cold before its first tick",r.info[t.id].hot,0)
+    near("battery initially shows configured empty charge",r.info[b.id].stored,0)
+    near("battery marks the actual startup cost",r.info[b.id].startupCosts[1],5)
+    ticks(r,1,false)
+    eq("trigger displays output rather than button input",r.info[t.id].hot,1)
+    near("refill reaches the battery display",r.info[b.id].stored,1)
+    ticks(r,4)
+    eq("strike starts when the charge reaches the mark",r.stats.fired,1)
+    near("startup spending empties the displayed reservoir",r.info[b.id].stored,0)
+    ticks(r,3,true)
+    eq("inverted hot input displays cold output",r.info[t.id].hot,0)
+    near("battery displays recovery while the trigger is cold",r.info[b.id].stored,3)
+    r:rebuild()
+    near("reset immediately restores the displayed initial charge",r.info[b.id].stored,0)
+    eq("reset clears the visible trigger state",r.info[t.id].hot,0)
+  end
+  do
+    local g,_,b,_,s=fixture("single","ranged",{battery={capacity=10,fillRate=0,initialCharge=0.5},
+      striker={startupCost=3,sizeCost=0.2,radius=2,weight=2}})
+    local extra=node(g,"battery","infinite",{capacity=20,tier="rare",initialCharge=0.5})
+    wire(g,s,extra)
+    local _,childBattery=downstream(g,s,"complete",7)
+    local r=world(g)
+    near("battery display uses pooled tier-adjusted capacity",r.info[b.id].capacity,40)
+    near("battery display uses pooled initial energy",r.info[b.id].stored,20)
+    near("all batteries in a sequence show the same pool",r.info[extra.id].stored,20)
+    near("startup mark includes size and weight costs",r.info[b.id].startupCosts[1],4.6)
+    near("downstream battery has its own threshold",r.info[childBattery.id].startupCosts[1],1)
+    near("downstream battery has its own charge",r.info[childBattery.id].stored,7)
+    M.set(extra,"tier","legendary") r:rebuild()
+    near("tier edits update the meter capacity immediately",r.info[b.id].capacity,50)
+    near("tier edits update the initial charge immediately",r.info[b.id].stored,25)
+  end
+  do
+    local g,t=fixture("hit") local r=world(g)
+    r:context(r.sequences[1],{kind="hit",x=0,y=0})
+    r:context(r.sequences[1],{kind="complete",x=0,y=0})
+    ticks(r,1,false)
+    eq("a later cold context cannot hide another context's hot output",r.info[t.id].hot,1)
+    ticks(r,1)
+    eq("event trigger display returns cold on the following tick",r.info[t.id].hot,0)
+    ticks(r,10)
+    eq("retired event contexts leave no stale hot display",r.info[t.id].hot,0)
+  end
+  do
+    local g,_,b,a=fixture("single","ranged",{striker={startupCost=5}})
+    local second=node(g,"striker","ranged",{startupCost=9,sizeCost=0}) wire(g,a,second,2)
+    local same=node(g,"striker","ranged",{startupCost=5,sizeCost=0}) wire(g,a,same,3)
+    local r=world(g) local costs=r.info[b.id].startupCosts
+    eq("equal branch costs share one battery mark",#costs,2)
+    near("first mark is the lower branch startup cost",costs[1],5)
+    near("second mark preserves a different branch startup cost",costs[2],9)
+  end
   suite("mws v2: application input coalescing")
   do
     local i=require("framework.input") i.resetFire()

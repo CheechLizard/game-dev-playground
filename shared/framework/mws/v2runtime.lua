@@ -201,7 +201,9 @@ function R:walk(ctx,n,signal,p,path,payloads)
       h[i]=copy(p) if old then p=copy(old) p.fixed=true end
     end
     signal=state:step(signal,observation)
-    self.info[n.id].hot=signal
+    -- A module can execute in several event contexts/routes in the same tick.
+    -- Display hot if any execution is hot, regardless of iteration order.
+    self.info[n.id].hot=math.max(self.info[n.id].hot,signal)
     if signal==1 then ctx.lastHot=ctx.age end
   elseif n.type=="striker" then
     if signal==1 then
@@ -326,6 +328,7 @@ function R:simulate(s)
 end
 function R:step()
   self.time=self.time+STEP self.stalled=false
+  for _,info in pairs(self.info) do if info.hot~=nil then info.hot=0 end end
   for _,seq in ipairs(self.sequences) do seq.energy=math.min(seq.capacity,seq.energy+seq.rate*STEP) end
   local incoming=self.pending self.pending={}
   for _,q in ipairs(incoming) do

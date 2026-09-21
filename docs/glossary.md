@@ -103,6 +103,7 @@ experimental choices. The two vocabularies are separated below.
 | **Hot / cold** | Trigger output 1 / 0. A hot output can start a new strike whenever startup energy is available, including after exhaustion and refill. |
 | **DOI** | Direction of input. Barrels transform and route it in order. Without a Barrel, firing direction is random and ignores it. |
 | **Startup cost** | Energy required to start one strike. Above capacity it can never start; above current stored energy the firing opportunity is skipped. |
+| **Battery charge indicator** | Live fill of the sequence's stored energy relative to capacity. Side ticks mark distinct strike startup costs; an upward chevron marks a cost above capacity. All batteries on one rail show the same shared pool. |
 | **Exhaustion** | Inability to fund a required continuing cost; ends an active strike. Subsequent firing creates a fresh strike rather than resuming it. |
 | **Hit** | An event for a qualifying contact during a strike, with accumulated hit count. Counting rules for sustained AOE remain open. |
 | **Complete** | One final event when an actual strike ends, including through energy exhaustion; carries final hit count. A skipped start has no completion event. |

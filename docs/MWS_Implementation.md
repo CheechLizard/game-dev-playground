@@ -46,6 +46,19 @@ completions, zero-hit completions and unaffordable firing opportunities. Skips
 are never queued. The footer shows the latest event, sequence and hit count.
 Invalid graphs are inactive and display a validation message.
 
+Trigger tiles show **HOT** with a filled accent icon or **COLD** with an outlined
+icon, using the output of the latest simulation tick. Selection only changes the
+tile border. If a module executes in several contexts, any hot output makes its
+tile hot. A one-tick pulse lasts 1/60 second; the display does not extend it.
+
+Battery icons fill from the bottom with their sequence's stored energy divided
+by its total capacity. Batteries sharing a sequence display the same pool.
+A short tick beside the cell marks the energy needed to start one strike,
+including size and weight costs. Different branch costs get separate ticks;
+an upward chevron means a cost exceeds capacity. Continuing work and payload
+spending drain the fill as they happen. The mark does not promise enough energy
+to finish a strike. Edits and Reset test refresh these indicators immediately.
+
 ## Available modules
 
 | Class | Implemented subclasses |

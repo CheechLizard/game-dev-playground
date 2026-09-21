@@ -6,8 +6,9 @@
 -- 4px rhythm from ui like everything else, so it still looks like the rest of
 -- the program rather than like a node editor someone bolted on.
 --
--- A node is a 48px tile: an icon, a three-letter tag, and nothing else. The
--- numbers live in the inspector, on the same widgets the zoo's placards use.
+-- A node is a 48px tile: an icon and a short tag. Live v2 Trigger output and
+-- Battery charge are drawn into those shapes. The configurable numbers live
+-- in the inspector, on the same widgets the zoo's placards use.
 -- Putting a module's properties on its box makes a six-module weapon wider
 -- than any panel it has to fit in, and the shape of the graph is what the
 -- canvas is for -- the values have a better home a few pixels away.
@@ -31,21 +32,44 @@ flowchart.NODE = NODE
 --
 -- One per module type, drawn from primitives like every other piece of art
 -- here. Each draws inside a box of half-extent `s` centred on the origin,
--- in whatever colour is already set.
+-- in whatever colour is already set; live state uses the UI accent.
 
 local ICONS = {}
 
 --- A cell with a terminal on top and a charge level inside.
-ICONS.battery = function(g, s)
+ICONS.battery = function(g, s, live)
   g.rectangle("line", -s * 0.52, -s * 0.66, s * 1.04, s * 1.32)
   g.rectangle("fill", -s * 0.2, -s * 0.92, s * 0.4, s * 0.26)
-  g.rectangle("fill", -s * 0.3, -s * 0.12, s * 0.6, s * 0.66)
+  local charge=live and (live.capacity>0 and live.stored/live.capacity or 0) or 0.6
+  charge=math.max(0,math.min(1,charge))
+  if live then g.setColor(ui.theme.accent) end
+  if charge>0 then
+    g.rectangle("fill", -s * 0.34, s * (0.52-1.04*charge), s * 0.68, s * 1.04*charge)
+  end
+  if live then
+    g.setColor(ui.theme.fg)
+    local overCapacity=false
+    for _,cost in ipairs(live.startupCosts or {}) do
+      if cost>live.capacity then overCapacity=true
+      else
+        local fraction=live.capacity>0 and cost/live.capacity or 0
+        local y=s*(0.52-1.04*fraction)
+        g.line(s*0.54,y,s*0.86,y)
+      end
+    end
+    if overCapacity then
+      -- A threshold above capacity cannot be reached, even by a full battery.
+      g.line(s*0.61,-s*0.59,s*0.75,-s*0.78,s*0.89,-s*0.59)
+    end
+  end
 end
 
 --- A play triangle against a bar: the thing that starts it.
-ICONS.trigger = function(g, s)
-  g.rectangle("fill", -s * 0.8, -s * 0.66, s * 0.26, s * 1.32)
-  g.polygon("fill", -s * 0.28, -s * 0.66, s * 0.82, 0, -s * 0.28, s * 0.66)
+ICONS.trigger = function(g, s, live)
+  local mode=live and live.hot==0 and "line" or "fill"
+  if live then g.setColor(live.hot==1 and ui.theme.accent or ui.theme.fg) end
+  g.rectangle(mode, -s * 0.8, -s * 0.66, s * 0.26, s * 1.32)
+  g.polygon(mode, -s * 0.28, -s * 0.66, s * 0.82, 0, -s * 0.28, s * 0.66)
 end
 
 --- The same arrow three times over: one window, many strikes.
@@ -96,12 +120,12 @@ end
 
 --- Draw a module type's icon centred on cx, cy at half-extent `size`.
 -- Exposed so the palette marks a button with the same shape the canvas uses.
-function flowchart.icon(typeId, cx, cy, size)
+function flowchart.icon(typeId, cx, cy, size, live)
   local g = love.graphics
   local fn = ICONS[typeId]
   g.push()
   g.translate(cx, cy)
-  if fn then fn(g, size) else g.circle("line", 0, 0, size * 0.7) end
+  if fn then fn(g, size, live) else g.circle("line", 0, 0, size * 0.7) end
   g.pop()
 end
 
@@ -209,6 +233,8 @@ local function drawNode(view, rect, g, node, opts)
   local tagH = TAG * view.zoom
   local selected = (view.selected == node.id)
   local problem = opts.problems and opts.problems[node.id]
+  local info = opts.info and opts.info[node.id]
+  local live = g.version==2 and info or nil
 
   setColour(ui.theme.background)
   gfx.rectangle("fill", x, y, size, size)
@@ -230,14 +256,18 @@ local function drawNode(view, rect, g, node, opts)
 
   setColour(selected and ui.theme.accent or ui.theme.fg)
   flowchart.icon(node.type, x + size / 2, y + (size - tagH) / 2,
-    (size - tagH) * 0.32)
+    (size - tagH) * 0.32, live)
 
-  local font = fonts.get("pixel", 8)
+  local font = fonts.get("pixel", math.max(8,math.floor(view.zoom*4)))
   gfx.setFont(font)
   setColour(ui.theme.line)
   gfx.line(x, y + size - tagH + 0.5, x + size, y + size - tagH + 0.5)
   setColour(selected and ui.theme.accent or ui.theme.dim)
   local tag = t.short or t.name:sub(1, 3)
+  if live and node.type=="trigger" then
+    tag=live.hot==1 and "HOT" or "COLD"
+    setColour(live.hot==1 and ui.theme.accent or ui.theme.fg)
+  end
   gfx.print(tag, x + (size - font:getWidth(tag)) / 2,
     y + size - tagH + math.max(0, (tagH - font:getHeight()) / 2))
 
@@ -245,7 +275,6 @@ local function drawNode(view, rect, g, node, opts)
   -- that have any: a battery says what it supplies, a trigger and a repeater
   -- say what one strike off them costs against the rail that reaches them.
   -- Seeing both on the canvas is most of why the energy rule is learnable.
-  local info = opts.info and opts.info[node.id]
   if info and not info.orphan then
     local text
     if g.version==2 then
