@@ -91,10 +91,11 @@ change are a real before/after.
   JSON in `config/weapons/`, and overrides the built-in until reverted. Do not
   hand-edit the JSON — open the bench.
 - **Where MWS departs from the specification, say so in the comment.** The
-  file it implements lives in another project
-  (`ShmupRouge/Love2D/docs/entities/Modular_Weapon_System.md`), so an
-  unexplained difference reads as a bug rather than a decision. The departures
-  so far: barrel `routing`, barrel `aimMode`, and the segment rule for energy.
+  revised design is local: `docs/Modular_Weapon_System.md`. It explicitly marks
+  open decisions and is not yet implemented. The current code was built from
+  `ShmupRouge/Love2D/docs/entities/Modular_Weapon_System.md`; its original
+  departures include barrel `routing`, barrel `aimMode`, and the segment rule
+  for energy. Do not mistake those legacy rules for the revised sequence model.
 
 ## Where work lands
 

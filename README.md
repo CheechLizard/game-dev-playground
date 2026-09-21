@@ -4,6 +4,11 @@ A workspace for prototyping game ideas, with a shared framework that every game
 here gets for free: an in-game editor, a performance overlay, debug-draw layers,
 and config profiles.
 
+The revised [Modular Weapon System specification](docs/Modular_Weapon_System.md)
+and its [module interaction flow chart (SVG)](docs/diagrams/modular-weapon-system.svg)
+describe the next design. The current runtime and bench still implement the
+earlier model; the specification distinguishes agreed rules from open decisions.
+
 ```
 love .                      # run the default game
 love . --game horde-survivor

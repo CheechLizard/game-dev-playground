@@ -68,9 +68,40 @@ retired, update it here too.
 
 ## Modular Weapon System
 
-Implements `docs/entities/Modular_Weapon_System.md` from the ShmupRouge
-project. Where this implementation departs from that specification, the term
-says so.
+The revised design is in [Modular Weapon System v2.0](Modular_Weapon_System.md).
+The runtime still implements the earlier ShmupRouge specification. The two
+vocabularies are separated below so design changes are not mistaken for shipped
+behavior.
+
+### Revised design (not yet implemented)
+
+| Term | Meaning |
+|---|---|
+| **Module class** | A role: Trigger, Battery, Barrel, Striker, or Payload. Emitter's future is undecided. |
+| **Module subclass** | A particular behavior within a class, such as Repeater Trigger or Sweep Striker. |
+| **Module instance** | A configured module placed in a graph, with runtime state separate from its configuration. Acquisition and editing rules depend on the game/tool mode. |
+| **Sequence** | A graph subsection requiring a Trigger, Battery, and Striker; Barrels and Payloads are optional. A Striker-to-Trigger connection starts the next sequence. |
+| **Sequence rail** | One shared energy reservoir for a sequence. All its batteries contribute additively regardless of position or branch. No energy crosses sequence boundaries. |
+| **Capacity (C)** | The maximum energy a reservoir can hold, not its current contents. |
+| **Fill rate (R)** | Energy replenished per second while allowed by the battery subclass. |
+| **Stored energy (E)** | The reservoir's current spendable energy, between zero and capacity. |
+| **Battery tier** | Trash, common, rare, legendary, or celestial; affects both capacity and fill rate. Numerical scaling is open. |
+| **Input bitstream** | One bit per frame, supplied through the external input abstraction or derived from upstream striker events. Exact frame/event encoding remains open. |
+| **Hot / cold** | Trigger output 1 / 0. A hot output can start a new strike whenever startup energy is available, including after exhaustion and refill. |
+| **DOI** | Direction of input. Barrels transform and route it in order. Without a Barrel, firing direction is random and ignores it. |
+| **Startup cost** | Energy required to start one strike. Above capacity it can never start; above current stored energy the firing opportunity is skipped. |
+| **Exhaustion** | Inability to fund a required continuing cost; ends an active strike. Subsequent firing creates a fresh strike rather than resuming it. |
+| **Hit** | An event for a qualifying contact during a strike, with accumulated hit count. Counting rules for sustained AOE remain open. |
+| **Complete** | One final event when an actual strike ends, including through energy exhaustion; carries final hit count. A skipped start has no completion event. |
+| **Miss Trigger** | Activates on Complete only when `hitCount == 0`; not an unhandled-event fallback. |
+| **Complete Trigger** | Activates on every Complete event regardless of hit count. |
+| **Impact / AOE** | Broad behaviors: point damage / damage over time within an area. Not extra module classes. |
+
+### Current implementation (earlier model)
+
+The following terms describe the code as it exists, including differences from
+the original ShmupRouge specification. In particular, Segment, Rail, Strike cost,
+and Chain trigger below must not be used as definitions for the revised design.
 
 | Term | Meaning | Code |
 |---|---|---|
