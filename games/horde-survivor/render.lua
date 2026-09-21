@@ -358,7 +358,18 @@ function render.draw(r)
     local sz = st.state.collisionSize
     local kind = st.state.visual
     g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
-    if kind == "bolt" then
+    if st.v2 and (st.node.props.subclass=="stab" or st.node.props.subclass=="sweep") then
+      local reach=st.node.props.range
+      g.setLineWidth(math.max(1,sz*2))
+      g.line(st.x,st.y,st.x+st.dirX*reach,st.y+st.dirY*reach)
+      g.setLineWidth(1)
+    elseif st.v2 and st.node.props.subclass=="area" and st.node.props.arc<360 then
+      local half=math.rad(st.node.props.arc)/2
+      g.setColor(playerCol[1],playerCol[2],playerCol[3],0.3)
+      g.arc("fill","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
+      g.setColor(playerCol[1],playerCol[2],playerCol[3],0.85)
+      g.arc("line","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
+    elseif kind == "bolt" then
       local lx, ly = st.dirX * sz * 2.5, st.dirY * sz * 2.5
       g.setLineWidth(math.max(1, sz * 0.8))
       g.line(st.x - lx, st.y - ly, st.x + lx, st.y + ly)

@@ -6,9 +6,11 @@ and config profiles.
 
 The revised [Modular Weapon System specification](docs/Modular_Weapon_System.md)
 and its [module interaction flow chart (SVG)](docs/diagrams/modular-weapon-system.svg)
-describe the next design. [Implementation has begun](docs/MWS_Implementation.md)
-with the input adapter and Trigger primitives; the graph runtime and bench still
-use the earlier model. The specification separates agreed rules from open decisions.
+describe the target design. A [playable v2 test build](docs/MWS_Implementation.md)
+is available in the **F8 bench**, with six editable presets, independent batteries,
+all nine Trigger subclasses, and strike events. The survival game's existing
+weapons retain the earlier model. The implementation notes list the supported
+subset and every provisional choice.
 
 ```
 love .                      # run the default game
@@ -126,6 +128,17 @@ so a number you change in the editor is reflected there immediately. The
 
 ## The Modular Weapon System
 
+**V2 prototypes:** open **F8** and use **comma / period** to cycle Pulse, Beam
+exhaustion, Piercing + Miss, Complete + Field, Delayed single, and Sweep. Hold
+**Z** or **controller X** to fire, or use **Fire pulse / Hold fire** in the bench.
+The beam uses Toggle: press once to start, again to stop. Click modules to edit
+their subclass and settings; Save preserves each prototype separately. See the
+[test guide and limitations](docs/MWS_Implementation.md) before comparing the
+prototype with the full design spec.
+
+The description below applies to the **legacy survival-game weapons**, which
+remain available after the six prototypes in the bench.
+
 The Blaster is not a stat block. It is a graph of modules:
 
 ```
@@ -184,7 +197,11 @@ table the canvas is drawing, so a slider moves and the next shot is different.
 | `del` | remove the selected module |
 | `,` `.` | swap which weapon you are editing |
 
-The header shows energy in and out, and says `STALLING` when the batteries
+For v2 graphs, the header shows each sequence's stored energy, capacity, refill,
+and Fire/Hit/End/Miss/Skip counters. Property and wiring edits restart the test;
+moving tiles only changes the layout. Timing fields use ticks (60 = one second).
+
+For legacy graphs, the header shows energy in and out, and says `STALLING` when the batteries
 cannot keep up. Modules that cannot work — a chain trigger with no payload
 above it, a terminal module with something wired below — are outlined in the
 warning colour, and the first problem is named in the header.

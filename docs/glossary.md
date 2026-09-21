@@ -69,10 +69,10 @@ retired, update it here too.
 ## Modular Weapon System
 
 The revised design is in [Modular Weapon System v2.0](Modular_Weapon_System.md).
-The graph runtime still implements the earlier ShmupRouge specification, with
-the new input boundary integrated. New Trigger primitives are available separately;
-see [implementation status](MWS_Implementation.md). The two vocabularies are
-separated below so design changes are not mistaken for shipped behavior.
+The F8 bench offers playable v2 prototypes with sequence reservoirs and Trigger
+subclasses; the survival game retains its legacy graphs. See
+[implementation status](MWS_Implementation.md) for the supported subset and
+experimental choices. The two vocabularies are separated below.
 
 ### Revised design (partially implemented)
 
@@ -108,9 +108,9 @@ separated below so design changes are not mistaken for shipped behavior.
 | **Complete Trigger** | Activates on every Complete event regardless of hit count. |
 | **Impact / AOE** | Broad behaviors: point damage / damage over time within an area. Not extra module classes. |
 
-### Current implementation (earlier model)
+### Legacy implementation (survival game and older graphs)
 
-The following terms describe the code as it exists, including differences from
+The following terms describe the legacy code, including differences from
 the original ShmupRouge specification. In particular, Segment, Rail, Strike cost,
 and Chain trigger below must not be used as definitions for the revised design.
 

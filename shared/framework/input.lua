@@ -8,6 +8,22 @@ input.source = "keyboard"
 input.gamepad = nil
 
 local pressed = {}   -- edge-triggered actions consumed this frame
+local fireSources,firePressed={},false
+
+-- Application input normalization, above the MWS adapter. Bursts collapse to
+-- one observable hot tick; a held source stays hot. There is no press queue.
+function input.fireDown(source)
+  if not fireSources[source] then firePressed=true end
+  fireSources[source]=true
+end
+function input.fireUp(source) fireSources[source]=nil end
+function input.pulseFire() firePressed=true end
+function input.sampleFire()
+  local hot=firePressed or next(fireSources)~=nil
+  firePressed=false
+  return hot
+end
+function input.resetFire() fireSources={} firePressed=false end
 
 function input.init()
   if not love or not love.joystick then return end
@@ -22,6 +38,7 @@ function input.gamepadAdded(pad)
 end
 
 function input.gamepadRemoved(pad)
+  input.fireUp(pad)
   if input.gamepad == pad then
     input.gamepad = nil
     input.init()
@@ -101,13 +118,22 @@ local PAD_ACTIONS = {
 }
 
 function input.keypressed(key)
+  if key=="z" then input.fireDown("keyboard") end
   local action = KEY_ACTIONS[key]
   if action then input.press(action) end
 end
 
-function input.gamepadpressed(_, button)
+function input.keyreleased(key)
+  if key=="z" then input.fireUp("keyboard") end
+end
+
+function input.gamepadpressed(pad, button)
+  if button=="x" then input.fireDown(pad) end
   local action = PAD_ACTIONS[button]
   if action then input.press(action) end
+end
+function input.gamepadreleased(pad,button)
+  if button=="x" then input.fireUp(pad) end
 end
 
 return input

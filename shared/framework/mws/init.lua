@@ -13,5 +13,6 @@ mws.graph   = require("framework.mws.graph")
 mws.runtime = require("framework.mws.runtime")
 mws.input   = require("framework.mws.input")
 mws.triggers = require("framework.mws.triggers")
+mws.v2runtime = require("framework.mws.v2runtime")
 
 return mws

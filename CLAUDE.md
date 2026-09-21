@@ -21,7 +21,8 @@ extend the content table, not the schema, for those.
 
 **The one exception is a weapon graph.** An MWS graph has variable topology,
 so "node 7's fire rate" has no fixed key and cannot be a schema setting. Those
-properties are declared once in `shared/framework/mws/modules.lua`, which
+properties are declared once in `shared/framework/mws/modules.lua` (legacy) or
+`shared/framework/mws/v2modules.lua` (v2, importing Trigger metadata), which
 plays exactly the part the schema plays: the inspector, the node defaults and
 the graph JSON are all generated from it. Add a property there, not in the
 bench and not in the graph. Global MWS tunables that *are* a fixed list — the

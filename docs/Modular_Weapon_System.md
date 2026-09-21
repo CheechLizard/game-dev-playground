@@ -4,11 +4,12 @@
 
 **Updated:** 20 September 2026.
 
-**Implementation status:** migration has started with a normalized input adapter
-and tested Trigger primitives. The running graph, energy model, and editor still
-use the earlier model. See [implementation status](MWS_Implementation.md) for
-available APIs, prototype choices, and remaining stages. This document specifies
-the target design, not a claim of full implementation.
+**Implementation status:** a playable v2 subset is available in the F8 bench,
+including sequence reservoirs, all Trigger subclasses, strike events and editable
+prototype weapons. The survival game still uses legacy graphs. See
+[implementation status](MWS_Implementation.md) for test instructions, supported
+subclasses and prototype choices. This document specifies the target design,
+not a claim of full implementation.
 
 This is the local successor to the v1.1 specification at
 `/Users/joewheeler/Dev/ShmupRouge/Love2D/docs/entities/Modular_Weapon_System.md`.

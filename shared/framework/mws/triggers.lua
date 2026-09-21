@@ -1,8 +1,8 @@
 -- v2 Trigger subclasses: pure signal processing, once per simulation tick.
 -- No input bindings, energy, clocks, collision queries, or strike creation.
 -- These definitions own the v2 properties/defaults; an editor should read
--- them rather than maintain another list. The existing graph editor still
--- uses the legacy module declarations while its v2 migration is pending.
+-- them rather than maintain another list. The v2 graph registry imports these
+-- declarations; legacy graphs retain their original module definitions.
 
 local triggers = { types = {}, byId = {} }
 local Instance = {}

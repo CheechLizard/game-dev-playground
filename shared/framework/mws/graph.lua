@@ -488,4 +488,26 @@ function graph.clone(g)
   return (graph.fromTable(graph.toTable(g)))
 end
 
+-- Dispatch versioned authoring graphs through the same editor API. Existing
+-- saved graphs retain their v1 semantics rather than being silently rewritten.
+local v2=require("framework.mws.v2graph")
+function graph.newV2(id,name) return v2.new(id,name) end
+function graph.modules(g)
+  if g and g.version==2 then return require("framework.mws.v2modules") end
+  return mods
+end
+for _,name in ipairs({"addNode","parentOf","childrenOf","roots","connect",
+    "disconnect","removeNode","subtree","validate","isFirable","analyse",
+    "budget","toTable","clone"}) do
+  local legacy=graph[name]
+  graph[name]=function(g,...)
+    if g.version==2 then return v2[name](g,...) end
+    return legacy(g,...)
+  end
+end
+local oldFromTable=graph.fromTable
+function graph.fromTable(t)
+  if t.version==2 then return v2.fromTable(t) end
+  return oldFromTable(t)
+end
 return graph

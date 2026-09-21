@@ -1080,7 +1080,9 @@ function run:updateWeapons(dt)
       -- The game's autonomous input policy supplies a normalized action.
       -- Device timing/coalescing belongs above this weapon boundary, never
       -- in MWS. The legacy graph's cadence is unchanged during migration.
-      weapon.mws:inputEvent(#self.enemies > 0
+      local fire=self.fireSignal
+      if fire==nil then fire=#self.enemies>0 end
+      weapon.mws:inputEvent(fire
         and "FIRE_BUTTON_DOWN" or "FIRE_BUTTON_UP")
       weapon.mws:update(dt)
     elseif weapon.def.kind == "orbit" then
@@ -1292,12 +1294,12 @@ end
 function run:updateStrikes(dt)
   local alive = {}
   for _, s in ipairs(self.strikes) do
-    if s.alive then
+    if s.alive and not s.v2 then
       s.age = s.age + dt
       self:moveStrike(s, dt)
       self:collideStrike(s, dt)
     end
-    if s.alive then
+    if s.alive and not s.v2 then
       local st = s.state
       local spent = s.age >= (st.lifetimeMax or math.huge)
         or s.dist >= (st.rangeMax or math.huge)

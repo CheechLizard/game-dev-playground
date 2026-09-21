@@ -240,6 +240,13 @@ end
 
 --- Make a live weapon from a graph the run should fire.
 function arsenal.instance(r, weapon, g)
+  if g.version==2 then
+    local host=arsenal.host(r,weapon)
+    host.enemies=function() return r.enemies end
+    host.random=function() return r.rng.next() end
+    host.damage=function(_,target,damage) r:damageEnemy(target,damage,weapon.id,0,0,0) end
+    return mws.v2runtime.new(g,host)
+  end
   return mws.runtime.new(g, arsenal.host(r, weapon), {
     cost = arsenal.cost,
     buffer = config.values.mws.energyBuffer,
@@ -287,8 +294,15 @@ function arsenal.registerSettings(schema)
   schema.register{
     page = "Levels", section = "Bench", order = 80, sectionOrder = 20,
     settings = {
+      { key="bench.prototype",label="Prototype",type="enum",default="v2_pulse",
+        values=(function()
+          local ids={} for _,d in ipairs(require("weaponprototypes").list) do ids[#ids+1]=d.id end
+          return ids
+        end)(),help="V2 test weapon to open in the bench." },
+      { key="bench.holdFire",label="Hold fire (v2)",type="bool",default=false,
+        help="Supply a held fire action to v2 prototypes. Z or controller X fires manually." },
       { key = "bench.arenaFraction", label = "Arena height", type = "number",
-        default = 0.5, min = 0.2, max = 0.8, format = "%.2f",
+        default = 0.42, min = 0.2, max = 0.8, format = "%.2f",
         help = "How much of the screen the player and the dummies get. The "
           .. "rest is the graph." },
       { key = "bench.population", label = "Dummies", type = "int",

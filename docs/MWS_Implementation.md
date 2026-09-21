@@ -1,118 +1,140 @@
-# Modular Weapon System implementation status
+# Modular Weapon System: playable v2 test build
 
-The [v2 design specification](Modular_Weapon_System.md) is the target. Migration
-has begun with a signal-processing foundation and a normalized input boundary.
-The game graph, energy accounting, strike events, and bench still use the older
-model. Passing the legacy tests is not evidence of full v2 conformance.
+The [v2 specification](Modular_Weapon_System.md) remains the target. The F8 bench
+now runs editable v2 weapons with independent sequence reservoirs, real
+collisions, Hit/Complete events, all nine Trigger subclasses, and normalized
+input. This is a working subset, not every subclass. The ordinary survival game
+and its shop weapons still use the legacy runtime.
 
-## Implemented: input boundary and Trigger primitives
+## Try it
 
-| Component | Available behavior |
+Run `love .` from `~/Dev/game-dev-playground/main`, then press **F8**.
+The first six bench weapons are v2 prototypes; **comma / period** cycles weapons.
+The editor's **Levels → Bench → Prototype** setting also selects them.
+
+- **Z** or **controller X** supplies fire input. **Fire pulse** supplies one
+  pulse; **Hold fire** supplies continuous input. Turn Hold fire off when testing
+  individual presses. WASD/arrows/controller stick move the player.
+- Click a module to change its subclass, tier or settings. Timing values use
+  integer simulation ticks: **60 ticks = one second**. Enter or clicking outside
+  a timing field commits its value.
+- Drag output ports to inputs to connect modules; drag connected ports to
+  disconnect. Add modules using the palette. Delete removes the selection.
+- **Save** writes the graph to `config/weapons/<id>.json`. **Revert** removes
+  that override and restores the built-in graph.
+- Property/wiring edits reset runtime state and refill to configured initial
+  charge, without producing gameplay completion events. **Reset test** does the
+  same without changing the graph. Moving tiles does not reset.
+
+| Preset | What to test |
 |---|---|
-| `shared/framework/mws/input.lua` | Accepts normalized `FIRE_BUTTON_DOWN` and `FIRE_BUTTON_UP` events and exposes current signal state. No device handling or input queue. |
-| `shared/framework/mws/triggers.lua` | Independent Inverter, Single, Toggle, Delay, Repeater, Proximity, Hit, Miss, and Complete instances. Each evaluates one bit per simulation tick. |
-| `runtime:inputEvent(event)` | The running game graph now accepts normalized fire events through the adapter. `setFiring` remains a compatibility entry point for existing callers. |
-| `tools/triggersuite.lua` | Signal examples, chained order, startup behavior, delay preservation, pulse timing, sensor/event conversion, and instance isolation. Included by `tools/test.lua`. |
+| V2 / Pulse | Hold fire: Repeater pulses immediately, then every 18 ticks. Release and press again to restart its pattern. |
+| V2 / Beam exhaustion | Press once to toggle on. The 40-capacity, 10 e/s battery drains; the beam ends, then fresh beams start as energy recovers. Press again to toggle off. Upgrade Battery tier/refill to sustain it longer. |
+| V2 / Piercing + Miss | Tap for a piercing shot. The second sequence creates a field only after zero-hit completion. Set dummy population to zero in Levels to observe Miss reliably. |
+| V2 / Complete + Field | Hold fire: each shot's completion starts a separately powered field, whether it hit or missed. Both reservoirs appear in the header. |
+| V2 / Delayed single | Tap, then move: a shot fires 60 ticks later from its captured origin. Release never cancels it. The downstream Seeking barrel selects a target at execution time. |
+| V2 / Sweep | Hold fire for repeated sweeps. Each runs to completion after its input pulse goes cold because Release ends strike is off. |
 
-Trigger class metadata, configurable properties, and defaults are declared once
-in `mws.triggers.types` / `mws.triggers.byId`. These declarations are the intended
-source for the future subclass inspector. They do not yet replace the legacy
-graph's Trigger conditions or its separate Repeater module. The new Trigger
-primitives currently run through their public API and headless tests, not through
-the existing bench.
+The header shows stored energy / capacity and refill for each sequence. Fire,
+Hit, End, Miss and Skip counters show actual strikes, distinct contacts,
+completions, zero-hit completions and unaffordable firing opportunities. Skips
+are never queued. The footer shows the latest event, sequence and hit count.
+Invalid graphs are inactive and display a validation message.
 
-The existing game's autonomous firing policy still supplies fire-down while
-enemies exist and fire-up otherwise. Player bindings, quick-tap recognition, and
-between-tick coalescing are responsibilities of a future application input-layer
-integration. The adapter does not implement them. Feeding raw down/up bursts to
-the adapter directly only changes its current state; it cannot preserve a short
-tap that the upper layer failed to normalize.
+## Available modules
 
-## Using the foundation
+| Class | Implemented subclasses |
+|---|---|
+| Trigger | Inverter, Single, Toggle, Delay, Repeater, Proximity, Hit, Miss, Complete |
+| Battery | Infinite, with capacity, refill, initial charge and five tiers |
+| Barrel | Forward, Directional, Spread, Multi, Alternating, Blind, Seeking, Weakling, Bossling, Rotating, Bounce, Refract |
+| Striker | Ranged, Piercing, Stab, Sweep, Area, Orbit |
+| Payload | Sharp, Impact, Plasma, with primitive visual effects |
 
-Call the signal pipeline once per simulation tick, not once per rendered frame:
+The v2 palette has five classes. Repeater is a Trigger subclass; Emitter is absent.
+All batteries add across their sequence, regardless of placement/branch. Direct
+**Striker → Trigger** starts another sequence. Energy is never inherited or
+duplicated across that boundary or branch executions. Unaffordable pulses are
+dropped; hot signals retry when startup becomes affordable. Exhaustion ends the
+old strike; restart creates a new one. Payload-free strikes still produce events.
+Without a Barrel, firing direction is random and ignores incoming direction.
 
-```lua
-local mws = require("framework.mws")
-local input = mws.input.new()
-local toggle = mws.triggers.new("toggle")
-local repeater = mws.triggers.new("repeater", {
-  periodTicks = 6,
-  pulseTicks = 2,
-})
+## Explicit prototype choices and departures
 
--- The external input layer supplies these normalized action events.
-input:handle("FIRE_BUTTON_DOWN")
+These make unsettled parts testable; they do not amend the design specification.
 
--- During each simulation tick, in graph order:
-local signal = toggle:step(input:sample())
-local fireRequest = repeater:step(signal)
--- A future sequence runtime will offer this bit to its striker and power rail.
+1. **Timing/input:** v2 bench simulation runs at 60 Hz. The application input layer
+   collapses between-tick presses to one hot sample, preserves short taps, ignores
+   held-key repeats, and supports separate keyboard/controller sources. The
+   adapter receives named fire-down/up events only; no press replay queue.
+2. **Charge/tiers:** batteries default to full, with editable initial-charge
+   fraction. Trash/common/rare/legendary/celestial multipliers are
+   0.5/1/1.5/2/3 for both capacity and refill. Repeater divides its base period by
+   the multiplier, rounds to the nearest tick and clamps to at least two ticks.
+   Effective width is capped at period minus one. These are provisional values.
+3. **Energy scheduling:** refill happens first, starts follow stable graph/port
+   order, then continuing costs follow creation order. Branches share one balance;
+   no fairness scheduler. Unaffordable whole-tick work ends the strike rather than
+   funding part of the tick.
+4. **Costs:** startup is `startupCost + sizeCost × radius² × weight`. Continuing
+   work costs `draw × dt + distanceCost × distance × weight`. Projectiles use
+   actual travel; Orbit uses arc distance; Stab/Sweep use reach × dt. Sharp spends
+   configured energy once per distinct target. Impact also scales damage by
+   weight × max(0.1, speed / 100). Plasma spends configured energy/second **per
+   overlapping target per tick**. Funded energy becomes damage through efficiency.
+   The remaining reservoir is not automatically emptied on every hit.
+5. **Concurrency:** Ranged/Piercing request a collider each hot tick.
+   Stab/Sweep/Area/Orbit maintain one per execution route. Release ends sustained
+   strikes only when their setting enables it. Active initial direction stays
+   fixed except Sweep/Orbit motion. Root sustained origins follow the wielder;
+   event and delayed origins remain at their captured location.
+6. **Events:** hits count distinct targets per strike, including beams/fields.
+   Sharp/Impact apply once per target; Plasma continues while overlapping.
+   Complete fires once with final hit count; Miss accepts only count zero.
+   Every qualifying event creates its own downstream execution context and
+   one-tick pulse; all events from a tick arrive together next tick. Contexts
+   own Trigger/Delay state but **share the sequence reservoir**. This is the
+   provisional policy for the spec's unresolved collision-event batching.
+7. **Routing:** one parent per node, no cycles or multi-input joins.
+   Multi/Alternating map directions cyclically across connected children in port
+   order; one connected child receives all lanes. A Striker before Multi applies
+   to every lane, each resulting collider paying its own cost. Separate physical
+   output paths create separate strike plans. Event branches connect directly
+   to the Striker.
+8. **Geometry:** Proximity uses an explicit sensor radius, independent of upstream
+   gating. Enemies are circles; projectiles sweep their traveled segment, Stab/
+   Sweep use thick lines, Area uses a circular sector, Orbit a moving circle.
+   Sustained contact normals are approximate; projectile contacts follow travel
+   order. Size/shape belongs to the Striker; a Payload shape editor is deferred.
+9. **Scope:** Instant/Ammo/Constant/Timer Batteries, Drone, Oscillating/Zig-zag and
+   multi-input Barrels, and Burning/Corrosive/Freezing/Black-hole Payloads remain
+   unimplemented and absent from the palette. Old saved graphs/shop weapons
+   retain legacy behavior. V2 does not inherit legacy player/weapon modifiers.
+   Acquisition, loot, and a new shop are not part of this build.
+10. **Limits/reset:** 512 live colliders and 256 execution contexts per weapon
+    guard against runaway graphs. Excess work is dropped and increments a visible
+    LIMIT REACHED counter; it is never replayed. These are prototype guards, not
+    battery semantics. Authoring edits and Reset test deliberately clear work.
 
-input:handle("FIRE_BUTTON_UP")
+## Code and verification
+
+`shared/framework/mws/v2modules.lua` declares properties once, importing Trigger
+metadata from `triggers.lua`. Inspector, defaults and JSON use that registry.
+`v2graph.lua` compiles membership/reservoir totals; `v2runtime.lua` runs signals,
+energy, collisions and events through a host adapter. `framework/input.lua`
+normalizes devices above `mws/input.lua`. `weaponprototypes.lua` owns the six
+graphs. Version 2 survives save/load; unversioned graphs stay on the old runtime.
+
+`luajit tools/test.lua` covers Trigger traces, input coalescing, independent/additive
+reservoirs, dropped starts, exhaustion/restart, actual piercing collisions,
+Hit/Miss/Complete routing, shared energy across event contexts, delayed position,
+Barrel scope, JSON round-trips and game-host integration. Legacy tests remain.
+`luajit tools/balance.lua --runs 1 --seconds 180` compares the survival baseline.
+
+Reproducible visual checks:
+
+```sh
+tools/capture.sh /tmp/mws-pulse.png --mode bench --at 4 --seed 7 --set bench.holdFire=true
+tools/capture.sh /tmp/mws-beam.png --mode bench --at 0.5 --seed 7 --set bench.prototype=v2_beam --set bench.holdFire=true
+tools/capture.sh /tmp/mws-complete.png --mode bench --at 3 --seed 7 --set bench.prototype=v2_complete --set bench.holdFire=true
 ```
-
-`step` accepts booleans or integer bits and returns integer 0/1. Because Lua treats
-zero as truthy, consumers must compare results to 1, rather than use a bare
-`if fireRequest` condition. Instances copy their configuration and own separate
-state. Construct a new instance when changing configuration; in-place live
-reconfiguration/reset semantics are not implemented yet.
-
-The host supplies sensor observations instead of the Trigger querying the game:
-
-```lua
-local proximity = mws.triggers.new("proximity")
-local hot = proximity:step(0, { proximity = true })
-
-local miss = mws.triggers.new("miss")
-local result = miss:step(0, {
-  event = { kind = "complete", hitCount = 0, reason = "range" },
-})
-```
-
-Observations are local to a tick. Omitting an event on the following tick produces
-cold output. The event conversion primitive accepts one supplied event per
-instance/tick; it rejects an `events` batch rather than inventing a policy for
-multiple striker events. Adjacent qualifying events can produce adjacent hot
-bits. Their conversion to distinct downstream activations, including any need
-for separators, remains part of the unresolved event-encoding design. This is
-separate from the settled application-input rule of coalescing presses per tick.
-
-## Explicit prototype choices
-
-These choices make the primitive API executable; they are not additional settled
-game-design decisions:
-
-- Delay and Repeater timings use integer ticks. A zero-tick Delay passes its
-  input through immediately. Seconds-to-ticks rounding belongs to later authoring
-  integration; no rounding is silently imposed here.
-- Repeater requires `1 <= pulseTicks < periodTicks`, leaving a cold interval
-  between pulses. Rates faster than a tick can represent are rejected through
-  these integer limits. Numerical battery/Trigger tiers are not invented; future
-  content can assign shorter valid periods to higher Trigger tiers.
-- Proximity directly reports the host's detection bit. Collision geometry and
-  upstream gating remain open and are not implemented by this primitive.
-- Complete events require an explicit nonnegative integer hit count. Missing
-  information must not accidentally activate Miss.
-- Delay stores a bounded history of signal bits. It shifts both transitions and
-  does not cancel pending output when input goes cold. It is intentionally
-  different from a backlog of application presses being replayed later.
-
-Spatial/event metadata routing across a sequence or Delay is not implemented by
-the bit processor. That work belongs to sequence execution/context handling.
-
-## Remaining implementation stages
-
-1. Compile sequence membership and connect Trigger instances to live execution;
-   preserve the scope of modules around branches and sequence boundaries.
-2. Replace legacy energy accounting with independent sequence reservoirs,
-   startup costs, continuing draw, exhaustion, and hot-signal restart.
-3. Emit individual Hit events and final Complete with counts from actual
-   strikes, and route context into self-powered downstream sequences.
-4. Migrate class/subclass graph instances, serialization, validation, and the
-   editor together; replace legacy Repeater/Emitter paths and saved graphs.
-5. Add and exercise the remaining Barrel, Striker, Battery, and Payload behaviors,
-   recording experimental choices where the design is still open.
-
-The full game/editor does not support the new reservoir or restart rules yet.
-Those rules should not be inferred from the existing legacy graph readouts.

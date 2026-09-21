@@ -297,6 +297,11 @@ end
 
 -- ------------------------------------------------------------------- mws
 
+local v2Ok,v2Err=pcall(function()
+  require("tools.mwsv2suite").run(suite,check,eq,near)
+end)
+if not v2Ok then suite("mws v2 runtime") check("sequence suite completed",false,v2Err) end
+
 local triggersOk, triggersErr = pcall(function()
   require("tools.triggersuite").run(suite, check, eq)
 end)

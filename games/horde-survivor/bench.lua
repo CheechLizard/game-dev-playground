@@ -20,6 +20,7 @@ local ui = require("framework.ui")
 local arsenal = require("arsenal")
 local flowchart = require("framework.mws.flowchart")
 local mws = require("framework.mws")
+local input = require("framework.input")
 
 local G = mws.graph
 
@@ -73,6 +74,7 @@ end
 --- Every weapon in the game built from modules, in content order.
 local function mwsWeapons()
   local out = {}
+  for _,def in ipairs(require("weaponprototypes").list) do out[#out+1]=def end
   for _, def in ipairs(content.weapons) do
     if def.kind == "mws" then out[#out + 1] = def end
   end
@@ -96,8 +98,11 @@ function bench.new()
     fitPending = true,
     showHelp = false,
     spawnTimer = 0,
+    accumulator = 0,
   }
-  if #s.defs > 0 then bench.equip(s, 1) end
+  local selected=1
+  for i,d in ipairs(s.defs) do if d.id==config.values.bench.prototype then selected=i end end
+  if #s.defs > 0 then bench.equip(s, selected) end
   return s
 end
 
@@ -106,10 +111,13 @@ function bench.equip(s, index)
   if #s.defs == 0 then return end
   s.selection = ((index - 1) % #s.defs) + 1
   local def = s.defs[s.selection]
+  if def.prototype then config.set("bench.prototype",def.id) end
+  s.prototype=config.values.bench.prototype
   local r = s.run
   r.player.weapons = {}
   r.strikes, r.effects, r.particles = {}, {}, {}
-  local weapon = r:addWeapon(def.id)
+  local weapon = r:addWeapon(def.prototype and "blaster" or def.id)
+  if def.prototype then r:buildWeaponGraph(weapon,arsenal.load(def.graph)) end
   s.weapon = weapon
   s.graph = weapon and weapon.graph
   -- Open on the module that starts the weapon, so the inspector has something
@@ -117,6 +125,8 @@ function bench.equip(s, index)
   local roots = s.graph and G.roots(s.graph)
   s.view.selected = roots and roots[1] and roots[1].id or nil
   s.fitPending = true
+  s.accumulator=0
+  input.resetFire()
 end
 
 function bench.cycle(s, direction)
@@ -147,6 +157,9 @@ end
 function bench.update(s, dt, moveX, moveY)
   local r = s.run
   local c = config.values
+  if s.prototype~=c.bench.prototype then
+    for i,d in ipairs(s.defs) do if d.id==c.bench.prototype then bench.equip(s,i) break end end
+  end
   fitArena(s)
 
   r.player.invulnerable = true
@@ -165,7 +178,14 @@ function bench.update(s, dt, moveX, moveY)
       margin + r.rng.next() * (r.arenaH - margin * 2))
   end
 
-  r:update(dt, moveX, moveY)
+  if s.graph and s.graph.version==2 then
+    s.accumulator=s.accumulator+dt
+    while s.accumulator+1e-9>=1/60 do
+      s.accumulator=s.accumulator-1/60
+      r.fireSignal=input.sampleFire() or c.bench.holdFire
+      r:update(1/60,moveX,moveY)
+    end
+  else r.fireSignal=nil r:update(dt, moveX, moveY) end
 
   if c.bench.dummyStill then
     for _, e in ipairs(r.enemies) do e.vx, e.vy = 0, 0 end
@@ -213,6 +233,7 @@ end
 --- Delete the selection from the keyboard. The canvas is a mouse surface, and
 -- reaching for a button every time you remove a module gets old fast.
 local function handleKeys(s, g)
+  if ui.capturingKeyboard() then return end
   for _, key in ipairs(ui.keysPressed()) do
     if (key == "delete" or key == "backspace") and s.view.selected then
       G.removeNode(g, s.view.selected)
@@ -261,6 +282,15 @@ function bench.drawOverlay(s, scale, ox, oy)
   local stalling = supply < demand
   local energyText = string.format("energy  %.0f/s in   %.0f/s out%s",
     supply, demand, stalling and "   STALLING" or "")
+  if g.version==2 then
+    local rt=s.weapon.mws
+    local parts={}
+    for _,seq in ipairs(rt.sequences) do
+      parts[#parts+1]=string.format("S%d %.0f/%.0f +%.0f/s",seq.id,seq.energy,seq.capacity,seq.rate)
+    end
+    energyText=table.concat(parts,"   ")
+    stalling=rt.stalled
+  end
   local statusY = panelY + pad / 2 + lineH
   gfx.setColor(stalling and ui.theme.warn or ui.theme.dim)
   gfx.print(energyText, pad, statusY)
@@ -272,8 +302,12 @@ function bench.drawOverlay(s, scale, ox, oy)
   local statusX = pad + ui.textWidth(energyText) + ui.sectionGap
   gfx.setColor(isError and (ui.theme.danger or ui.theme.warn)
     or (problem and ui.theme.warn or ui.theme.dim))
+  local stats=s.weapon.mws.stats
+  local status=stats and string.format("fire %d  hit %d  end %d  miss %d  skip %d%s",
+    stats.fired,stats.hits,stats.completed,stats.misses,stats.skipped,
+    stats.limited>0 and "  LIMIT REACHED" or "")
   gfx.print(ui.ellipsise(problem
-    or string.format("%d modules   %d live strikes", #g.order, #s.run.strikes),
+    or status or string.format("%d modules   %d live strikes", #g.order, #s.run.strikes),
     ww - statusX - pad), statusX, statusY)
 
   -- ---- body: canvas on the left, the selected module's values on the right
@@ -305,7 +339,15 @@ function bench.drawOverlay(s, scale, ox, oy)
   -- ---- palette and actions, under the canvas
   gfx.setFont(small)
   ui.layout(pad, bodyY + canvasH + pad / 2, canvasW - pad * 2)
-  local picked = flowchart.palette(canvasW - pad * 2, 4)
+  if g.version==2 then
+    local cx,cy,cw=ui.nextRow() local bw=math.floor(cw/3)-ui.rowGap
+    if ui.button("bench.fire","Fire pulse",{x=cx,y=cy,width=bw}) then input.pulseFire() end
+    if ui.button("bench.hold","Hold fire",{x=cx+bw+ui.rowGap,y=cy,width=bw,selected=config.get("bench.holdFire")}) then
+      config.set("bench.holdFire",not config.get("bench.holdFire"))
+    end
+    if ui.button("bench.reset","Reset test",{x=cx+2*(bw+ui.rowGap),y=cy,width=bw}) then rearm(s) end
+  end
+  local picked = flowchart.palette(canvasW - pad * 2, g.version==2 and 5 or 4, g)
   if picked then
     flowchart.addNode(s.view, g, picked, rect)
     rearm(s)
@@ -334,8 +376,8 @@ function bench.drawOverlay(s, scale, ox, oy)
   if ui.button("bench.revert", "Revert", { x = slot(3), y = y, width = cell,
       align = "center",
       disabled = not arsenal.hasOverride(def.graph or def.id) }) then
-    arsenal.revert(def.graph or def.id)
-    s.graph = s.run:buildWeaponGraph(s.weapon)
+    local restored=arsenal.revert(def.graph or def.id)
+    s.graph = s.run:buildWeaponGraph(s.weapon,restored)
     s.view.selected = nil
     s.fitPending = true
     s.notice = arsenal.status
@@ -343,7 +385,13 @@ function bench.drawOverlay(s, scale, ox, oy)
 
   gfx.setFont(small)
   gfx.setColor(s.notice and ui.theme.accent or ui.theme.dim)
-  gfx.print(ui.ellipsise(s.notice or s.view.message
+  local eventText
+  if g.version==2 then
+    local log=s.weapon.mws.log local e=log[#log]
+    eventText=e and string.format("%s S%d hits=%d %s | Z fire | drag ports to wire",e.kind,e.sequence,e.hitCount,e.reason or "")
+      or "Z fire | drag ports to wire | edits reset the test"
+  end
+  gfx.print(ui.ellipsise(s.notice or s.view.message or eventText
     or "drag a port to wire   drag a tile to move   drag the canvas to pan"
        .. "   wheel to zoom   del to remove",
     canvasW - pad * 2), pad, wh - lineH - pad / 2)
@@ -366,7 +414,7 @@ function bench.drawOverlay(s, scale, ox, oy)
   gfx.line(canvasW + 1, listY - ui.rowGap / 2 + 0.5, ww, listY - ui.rowGap / 2 + 0.5)
   local innerW = ui.beginScroll("bench.inspector", canvasW + 1, listY,
     inspectW - 1, listH)
-  flowchart.inspector(s.view, g, innerW, { showHelp = s.showHelp })
+  if flowchart.inspector(s.view, g, innerW, { showHelp = s.showHelp }) then rearm(s) end
   ui.endScroll("bench.inspector", canvasW + 1, listY, inspectW - 1, listH)
 
   -- An open dropdown draws last, or the panel it came from clips it.

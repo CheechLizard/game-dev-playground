@@ -134,7 +134,7 @@ local function inPort(node) return node.x, node.y + NODE / 2 end
 --- How many output ports to show: one more than are wired, so there is always
 -- somewhere to drag a new branch from and no separate "add port" control.
 local function visiblePorts(g, node)
-  local t = mods.byId[node.type]
+  local t = graph.modules(g).byId[node.type]
   if not t or t.outputs <= 0 then return 0 end
   if t.outputs == 1 then return 1 end
   local highest = 0
@@ -203,7 +203,7 @@ end
 
 local function drawNode(view, rect, g, node, opts)
   local gfx = love.graphics
-  local t = mods.byId[node.type]
+  local t = graph.modules(g).byId[node.type]
   local x, y = toScreen(view, rect, node.x, node.y)
   local size = NODE * view.zoom
   local tagH = TAG * view.zoom
@@ -248,7 +248,9 @@ local function drawNode(view, rect, g, node, opts)
   local info = opts.info and opts.info[node.id]
   if info and not info.orphan then
     local text
-    if node.type == "battery" then
+    if g.version==2 then
+      text=string.format("S%d %s",info.sequence,node.props.subclass:sub(1,4):upper())
+    elseif node.type == "battery" then
       local supply = opts.propOf and opts.propOf(node, "energyPerSecond")
         or node.props.energyPerSecond or 0
       text = string.format("+%.0f/s", supply)
@@ -256,7 +258,7 @@ local function drawNode(view, rect, g, node, opts)
       text = string.format("%.0f of %.0f", info.cost or 0, info.rail or 0)
     end
     if text then
-      local short = (info.rail or 0) < (info.cost or 0)
+      local short = (g.version==2 and (info.capacity or 0) or (info.rail or 0)) < (info.cost or 0)
       setColour(short and ui.theme.warn or ui.theme.dim)
       gfx.print(text, x + (size - font:getWidth(text)) / 2, y + size + 3)
     end
@@ -264,7 +266,7 @@ local function drawNode(view, rect, g, node, opts)
 
   -- Ports. Filled means wired, hollow means free.
   local parented = graph.parentOf(g, node.id)
-  if parented or not mods.isRoot(node.type) then
+  if parented or not graph.modules(g).isRoot(node.type) then
     local ix, iy = toScreen(view, rect, inPort(node))
     setColour(parented and ui.theme.fg or ui.theme.dim)
     gfx.circle(parented and "fill" or "line", ix, iy, 2.5)
@@ -435,7 +437,7 @@ function flowchart.addNode(view, g, typeId, rect)
   -- Wire it straight onto the selection when a port is free, because that is
   -- overwhelmingly the next thing you were going to do.
   if anchor then
-    local t = mods.byId[anchor.type]
+    local t = graph.modules(g).byId[anchor.type]
     for port = 1, (t and t.outputs or 0) do
       if not anchor.outputs[port] then
         if graph.connect(g, anchor.id, port, node.id) then break end
@@ -467,6 +469,9 @@ local function drawProp(node, prop, idPrefix)
   elseif prop.type == "string" then
     return ui.textField(id, label, tostring(value))
   elseif prop.type == "int" then
+    if (prop.max - prop.min) > 120 then
+      return ui.textField(id, label .. (prop.unit and " ("..prop.unit..")" or ""), tostring(value))
+    end
     if (prop.max - prop.min) <= 12 then
       return ui.stepper(id, label, value, prop.min, prop.max, 1, { integer = true })
     end
@@ -488,16 +493,18 @@ function flowchart.inspector(view, g, width, opts)
     return false
   end
 
-  local t = mods.byId[node.type]
+  local t = graph.modules(g).byId[node.type]
   ui.heading(t.name)
   ui.label(t.blurb, ui.theme.dim, ui.lineHeight)
   ui.space(2)
 
   local changed = false
-  for _, prop in ipairs(mods.props(node.type)) do
+  local registry=graph.modules(g)
+  for _, prop in ipairs(registry.props(node.type,node.props.subclass)) do
     local value, did = drawProp(node, prop, "mws." .. node.id)
     if did then
-      node.props[prop.name] = mods.coerce(prop, value)
+      if g.version==2 then registry.set(node,prop.name,value)
+      else node.props[prop.name] = mods.coerce(prop, value) end
       changed = true
     end
     if prop.help and opts.showHelp then
@@ -511,7 +518,7 @@ end
 --- The palette: one button per module type, each marked with the same icon
 -- the canvas uses, so the shape you pick is the shape you get.
 -- @return the type id clicked this frame, or nil
-function flowchart.palette(width, perRow)
+function flowchart.palette(width, perRow, g)
   perRow = perRow or 4
   local picked = nil
   local cellW = math.floor(width / perRow)
@@ -520,7 +527,7 @@ function flowchart.palette(width, perRow)
   local row, col = 0, 0
   local font = fonts.get("pixel", 8)
 
-  for _, t in ipairs(mods.types) do
+  for _, t in ipairs(graph.modules(g).types) do
     local bx = x0 + col * cellW
     local by = y0 + row * cellH
     local bw = cellW - ui.rowGap

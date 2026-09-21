@@ -172,11 +172,14 @@ function love.keypressed(key, scancode, isrepeat)
 end
 
 function love.textinput(t) ui.textinput(t) end
+function love.keyreleased(key) input.keyreleased(key) end
+function love.focus(focused) if not focused then input.resetFire() end end
 function love.wheelmoved(dx, dy) ui.wheelmoved(dx, dy) end
 function love.gamepadpressed(pad, button)
   input.gamepadpressed(pad, button)
   if game.gamepadpressed then game.gamepadpressed(pad, button) end
 end
+function love.gamepadreleased(pad,button) input.gamepadreleased(pad,button) end
 function love.joystickadded(pad) input.gamepadAdded(pad) end
 function love.joystickremoved(pad) input.gamepadRemoved(pad) end
 

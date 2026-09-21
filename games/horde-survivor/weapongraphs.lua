@@ -79,6 +79,8 @@ end
 
 --- Build a graph from its id, or nil when nothing declares it.
 function graphs.build(id)
+  local prototype=require("weaponprototypes").builders[id]
+  if prototype then return (prototype()) end
   local builder = graphs.builders[id]
   if not builder then return nil end
   return builder()
