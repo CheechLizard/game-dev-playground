@@ -63,6 +63,20 @@ function R:packet(ctx)
   return {x=p.x,y=p.y,dx=p.dx or 1,dy=p.dy or 0,nx=p.nx,ny=p.ny,
     aimed=false,fixed=ctx.event~=nil}
 end
+function R:inTargetRange(n,p,e)
+  local distance=math.sqrt((e.x-p.x)^2+(e.y-p.y)^2)
+  for _,striker in ipairs(self.info[n.id].targetStrikers or {}) do
+    local cfg=striker.props
+    local reach,inner=cfg.range,0
+    if cfg.subclass=="ranged" or cfg.subclass=="piercing" then
+      reach=math.min(reach,cfg.speed*cfg.duration)
+    elseif cfg.subclass=="area" then reach=0
+    elseif cfg.subclass=="orbit" then reach=cfg.orbitRadius inner=reach end
+    local margin=cfg.radius+(e.radius or 0)
+    if distance<=reach+margin and distance>=inner-margin then return true end
+  end
+  return false
+end
 function R:barrel(ctx,n,p,path)
   local cfg=n.props local mode=cfg.subclass
   local q=copy(p) local count=1
@@ -79,7 +93,7 @@ function R:barrel(ctx,n,p,path)
   elseif mode=="seeking" or mode=="weakling" or mode=="bossling" then
     local best,score
     for _,e in ipairs(self.host.enemies()) do
-      if not e.dead then
+      if not e.dead and self:inTargetRange(n,q,e) then
         local v=(e.x-q.x)^2+(e.y-q.y)^2
         if mode=="weakling" then v=e.hp elseif mode=="bossling" then v=-e.hp end
         if not score or v<score then best,score=e,v end

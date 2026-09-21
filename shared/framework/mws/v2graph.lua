@@ -65,6 +65,25 @@ function G.startup(n)
   return p.startupCost+p.sizeCost*p.radius*p.radius*p.weight
 end
 
+-- A Barrel uses its preceding Striker, or the first Strikers it feeds.
+-- Never borrow reach from a later event sequence or an unrelated branch.
+local function targetStrikers(g,n,info)
+  local sequence=info[n.id].sequence
+  local parent=G.parentOf(g,n.id)
+  while parent and info[parent.id].sequence==sequence do
+    if parent.type=="striker" then return {parent} end
+    parent=G.parentOf(g,parent.id)
+  end
+  local out={}
+  local function collect(current)
+    if info[current.id].sequence~=sequence then return end
+    if current.type=="striker" then out[#out+1]=current return end
+    for _,child in ipairs(G.childrenOf(g,current)) do collect(child.node) end
+  end
+  collect(n)
+  return out
+end
+
 function G.compile(g)
   local sequences,info,errors={},{},{}
   local function issue(id,text,level) errors[#errors+1]={nodeId=id,text=text,level=level or "error"} end
@@ -110,6 +129,7 @@ function G.compile(g)
       p.stored=seq.initial
       if n.type=="trigger" then p.hot=0 end
       if n.type=="battery" then p.startupCosts=costs end
+      if n.type=="barrel" then p.targetStrikers=targetStrikers(g,n,info) end
       p.cost=n.type=="striker" and G.startup(n) or 0
       if p.cost>seq.capacity then issue(n.id,"Startup cost exceeds sequence capacity","warn") end
       if n.type=="trigger" and not require("framework.mws.triggers").byId[n.props.subclass] then

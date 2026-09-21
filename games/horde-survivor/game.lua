@@ -300,11 +300,15 @@ function game.update(dt)
 
   -- While explicitly paused the menu owns input; the sim is frozen anyway.
   if paused then
+    input.resetFire()
     updatePauseMenu()
     return
   end
 
   if benchState then
+    -- Editing/pausing must not store a physical press for a later simulation
+    -- tick. The weapon's own Delay/Toggle state is deliberately untouched.
+    if editor.open or ui.capturingKeyboard() then input.resetFire() end
     if input.consume("prev") then bench.cycle(benchState, -1) end
     if input.consume("next") then bench.cycle(benchState, 1) end
     if input.consume("restart") then enterMode("bench") end

@@ -85,6 +85,9 @@ These make unsettled parts testable; they do not amend the design specification.
    collapses between-tick presses to one hot sample, preserves short taps, ignores
    held-key repeats, and supports separate keyboard/controller sources. The
    adapter receives named fire-down/up events only; no press replay queue.
+   Raw key-repeat callbacks cannot recreate fire after a release or input reset.
+   Pausing and editing discard pending physical presses; opening/closing F1 also
+   resets those presses. Existing weapon Delay/Toggle state is preserved.
 2. **Charge/tiers:** batteries default to full, with editable initial-charge
    fraction. Trash/common/rare/legendary/celestial multipliers are
    0.5/1/1.5/2/3 for both capacity and refill. Repeater divides its base period by
@@ -124,6 +127,15 @@ These make unsettled parts testable; they do not amend the design specification.
    Sweep use thick lines, Area uses a circular sector, Orbit a moving circle.
    Sustained contact normals are approximate; projectile contacts follow travel
    order. Size/shape belongs to the Striker; a Payload shape editor is deferred.
+   Seeking/Weakling/Bossling filter by reach before ranking targets. A Barrel
+   after a Striker uses that Striker; otherwise it uses the first Strikers on
+   its downstream paths, within the same sequence. A shared Barrel can target
+   within any of those Strikers' reaches. Projectiles use the smaller of range
+   and speed × duration, Stab/Sweep use reach, Area uses collider radius, and
+   Orbit uses its annulus. Collider/target radii count at the boundary. This is
+   a geometric filter, not a prediction of available energy or target movement.
+   With no eligible target, incoming DOI is preserved and a hot signal still
+   fires if startup is affordable.
 9. **Scope:** Instant/Ammo/Constant/Timer Batteries, Drone, Oscillating/Zig-zag and
    multi-input Barrels, and Burning/Corrosive/Freezing/Black-hole Payloads remain
    unimplemented and absent from the palette. Old saved graphs/shop weapons

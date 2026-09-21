@@ -153,7 +153,7 @@ function love.draw()
 end
 
 function love.keypressed(key, scancode, isrepeat)
-  if key == "f1" then editor.toggle() return end
+  if key == "f1" then input.resetFire() editor.toggle() return end
   if key == "f2" then config.set("perf.show", not config.get("perf.show")) return end
   if key == "f3" then debugdraw.toggle("colliders") return end
   if key == "f4" then debugdraw.master = not debugdraw.master return end
@@ -170,7 +170,7 @@ function love.keypressed(key, scancode, isrepeat)
   ui.keypressed(key)
   if ui.capturingKeyboard() then return end
 
-  input.keypressed(key)
+  input.keypressed(key,isrepeat)
   if game.keypressed then game.keypressed(key, scancode, isrepeat) end
 end
 

@@ -318,9 +318,9 @@ that behavior explicitly within a graph.
 | Multi | Fire simultaneously in N > 1 directions centered around incoming DOI. |
 | Alternating | Fire round-robin through N > 1 directions centered around incoming DOI. |
 | Blind | Choose a random direction, discarding incoming DOI. |
-| Seeking | Direct toward the nearest enemy. |
-| Weakling | Direct toward the weakest enemy. |
-| Bossling | Direct toward the strongest enemy. |
+| Seeking | Direct toward the nearest enemy within the applicable Striker's reach. |
+| Weakling | Direct toward the weakest enemy within the applicable Striker's reach. |
+| Bossling | Direct toward the strongest enemy within the applicable Striker's reach. |
 | Oscillating | Sinusoidal movement perpendicular to DOI. |
 | Zig-zag | Sawtooth movement perpendicular to DOI. |
 | Mixer | Combine N > 1 inputs into one output at their average DOI. |

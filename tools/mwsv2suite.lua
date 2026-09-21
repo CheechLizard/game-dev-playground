@@ -46,6 +46,67 @@ local function downstream(g,parent,sub,capacity)
 end
 
 function tests.run(suite,check,eq,near)
+  suite("mws v2: targeting only reachable enemies")
+  do
+    for _,sub in ipairs({"weakling","bossling","seeking"}) do
+      for _,after in ipairs({false,true}) do
+        local g,_,b,a,s=fixture("single","ranged",{striker={range=20,speed=60,duration=3}})
+        M.set(a,"subclass",sub)
+        if after then
+          G.disconnect(g,b.id,1) G.disconnect(g,a.id,1)
+          wire(g,b,s) wire(g,s,a)
+        end
+        local close,far=target(0,10),target(100,0)
+        close.hp=50 far.hp=sub=="bossling" and 100 or 1
+        local r,h=world(g,{far,close}) ticks(r,1,true)
+        near(sub.." aims at the reachable enemy "..(after and "after" or "before").." its Striker",h.spawned[1].dirY,1)
+      end
+    end
+    local g,_,_,a=fixture("single","ranged",{striker={range=200,speed=10,duration=1}})
+    M.set(a,"subclass","weakling")
+    local close,far=target(0,5),target(50,0) close.hp=50 far.hp=1
+    local r,h=world(g,{far,close}) ticks(r,1,true)
+    near("projectile targeting also respects travel before duration expires",h.spawned[1].dirY,1)
+    for _,mode in ipairs({"stab","sweep","area","orbit"}) do
+      local shaped,_,_,barrel=fixture("single",mode,{striker={range=20,radius=2,orbitRadius=20}})
+      M.set(barrel,"subclass","bossling")
+      local nearEnemy,farEnemy=target(0,mode=="area" and 1 or 20),target(100,0)
+      nearEnemy.hp=50 farEnemy.hp=100
+      local rt,host=world(shaped,{farEnemy,nearEnemy}) ticks(rt,1,true)
+      near(mode.." targeting uses its collider reach",host.spawned[1].packet.dy,1)
+    end
+    local scoped,_,_,barrel,striker=fixture("single","ranged",{striker={range=20}})
+    M.set(barrel,"subclass","weakling")
+    local _,_,field=downstream(scoped,striker,"complete") M.set(field,"radius",60)
+    local closeEnemy,farEnemy=target(0,10),target(50,0) closeEnemy.hp=50 farEnemy.hp=1
+    local rt,host=world(scoped,{farEnemy,closeEnemy}) ticks(rt,1,true)
+    near("a later sequence cannot extend the current barrel's targeting range",host.spawned[1].dirY,1)
+    local outside=target(100,0)
+    local rt2,host2=world(scoped,{outside}) host2.w.aimX=0 host2.w.aimY=1 ticks(rt2,1,true)
+    near("no reachable target preserves incoming direction",host2.spawned[1].dirY,1)
+  end
+  suite("mws v2: released fire stays quiet")
+  do
+    local i=require("framework.input") i.resetFire()
+    local g=fixture("repeater","ranged",{trigger={periodTicks=120},battery={capacity=100,fillRate=100}})
+    local r=world(g)
+    for frame=1,1200 do
+      if frame==1 then i.keypressed("z") end
+      if frame==3 then i.keyreleased("z") end
+      r:setFiring(i.sampleFire()) r:update(1/60)
+    end
+    eq("repeater never fires again after release across twenty seconds",r.stats.fired,1)
+    i.resetFire()
+    i.keypressed("z",true)
+    eq("a repeat callback without a new key-down cannot create fire input",i.sampleFire(),false)
+    i.keypressed("z") i.sampleFire() i.keyreleased("z") i.keypressed("z",true)
+    eq("a stale repeat after release cannot relatch fire",i.sampleFire(),false)
+    i.keypressed("z") i.sampleFire() i.resetFire() i.keypressed("z",true)
+    eq("repeat after a reset cannot restore a held source",i.sampleFire(),false)
+    i.keyreleased("z") i.keypressed("z")
+    eq("a fresh key-down still fires after a reset",i.sampleFire(),true)
+    i.keyreleased("z") i.resetFire()
+  end
   suite("mws v2: live module telemetry")
   do
     local g,t,b=fixture("inverter","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},
@@ -280,6 +341,41 @@ function tests.run(suite,check,eq,near)
     for _=1,240 do run:update(1/60,0,0) end
     check("the game host runs exhaustion and restart",w.mws.stats.fired>1)
     eq("the game uses the sequence runtime",w.mws.version,2)
+  end
+  suite("mws v2: bench input lifecycle")
+  do
+    local previousLove=love
+    local editor=require("framework.editor") local previousOpen=editor.open
+    local ok,err=pcall(function()
+      love={graphics={getDimensions=function() return 1280,720 end}}
+      require("tools.simsuite").bootstrap()
+      local config=require("framework.config") local input=require("framework.input")
+      config.set("bench.population",0) config.set("bench.holdFire",false)
+      input.resetFire()
+      local bench=require("bench") local state=bench.new()
+      for frame=1,600 do
+        if frame==1 then input.keypressed("z") end
+        if frame==2 then input.keyreleased("z") end
+        bench.update(state,1/120,0,0)
+      end
+      eq("between-frame tap produces one shot through the real bench",state.weapon.mws.stats.fired,1)
+      for _=1,600 do bench.update(state,1/60,0,0) end
+      eq("idle bench does not produce later spontaneous shots",state.weapon.mws.stats.fired,1)
+      input.keypressed("z") bench.equip(state,1) input.keypressed("z",true)
+      bench.update(state,1/60,0,0)
+      eq("weapon swap plus key repeat cannot start a new shot",state.weapon.mws.stats.fired,0)
+      local game=dofile("games/horde-survivor/game.lua") game.restart(7)
+      game.togglePause() input.pulseFire() game.update(1/60)
+      eq("paused application discards pending fire presses",input.sampleFire(),false)
+      game.togglePause() game.setMode("bench")
+      editor.open=true input.pulseFire() game.update(1/60)
+      eq("editor discards pending fire presses",input.sampleFire(),false)
+      editor.open=false game.update(1/60)
+      eq("closing the editor does not replay a fire press",input.sampleFire(),false)
+      input.resetFire()
+    end)
+    love,editor.open=previousLove,previousOpen
+    if not ok then error(err) end
   end
 end
 return tests

@@ -117,8 +117,10 @@ local PAD_ACTIONS = {
   dpup = "menuUp", dpdown = "menuDown",
 }
 
-function input.keypressed(key)
-  if key=="z" then input.fireDown("keyboard") end
+function input.keypressed(key,isrepeat)
+  -- Repeats cannot recreate a press after focus, an editor, or a weapon swap
+  -- cleared the held-source table. Only a fresh physical down starts firing.
+  if key=="z" and not isrepeat then input.fireDown("keyboard") end
   local action = KEY_ACTIONS[key]
   if action then input.press(action) end
 end
