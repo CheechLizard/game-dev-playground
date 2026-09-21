@@ -11,6 +11,11 @@ end
 local function int(name, label, default, min, max)
   return { name=name, label=label, type="int", default=default, min=min, max=max }
 end
+local function only(prop,...)
+  prop.subclasses={}
+  for _,id in ipairs({...}) do prop.subclasses[id]=true end
+  return prop
+end
 local function define(id, short, blurb, subclasses, default, props, outputs)
   local t = { id=id, name=id:upper(), short=short, blurb=blurb,
     outputs=outputs or 1, root=id=="trigger", props=props,
@@ -35,10 +40,12 @@ define("barrel", "BRL", "Transform incoming direction; order matters.",
   {"forward","directional","spread","multi","alternating","blind",
     "seeking","weakling","bossling","rotating","bounce","refract"},
   "forward", {
-    number("angle", "Angle offset", 0, -180, 180, "deg"),
-    int("count", "Directions", 3, 2, 8),
-    number("spread", "Spread arc", 30, 0, 360, "deg"),
-    number("rotationSpeed", "Rotation", 90, -720, 720, "deg/s"),
+    only(number("angle", "Angle offset", 0, -180, 180, "deg"),
+      "directional","spread","multi","alternating","rotating",
+      "seeking","weakling","bossling","bounce","refract"),
+    only(int("count", "Directions", 3, 2, 8),"multi","alternating"),
+    only(number("spread", "Spread arc", 30, 0, 360, "deg"),"spread","multi","alternating"),
+    only(number("rotationSpeed", "Rotation", 90, -720, 720, "deg/s"),"rotating"),
   }, 8)
 define("striker", "STK", "Creates colliders and emits Hit / Complete; requires energy.",
   {"ranged","piercing","stab","sweep","area","orbit"}, "ranged", {
@@ -73,8 +80,11 @@ M.triggerTier = {name="tier",label="Tier",type="enum",default="common",
 function M.props(typeId, subclass)
   local t = M.byId[typeId]
   if not t then return {} end
+  subclass=subclass or t.subclass.default
   local out = { t.subclass }
-  for _, p in ipairs(t.props) do out[#out+1]=p end
+  for _, p in ipairs(t.props) do
+    if not p.subclasses or p.subclasses[subclass] then out[#out+1]=p end
+  end
   if typeId=="trigger" then
     local def=triggers.byId[subclass or t.subclass.default]
     for _, p in ipairs(def and def.props or {}) do out[#out+1]=p end

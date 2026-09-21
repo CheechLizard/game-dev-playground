@@ -46,6 +46,52 @@ local function downstream(g,parent,sub,capacity)
 end
 
 function tests.run(suite,check,eq,near)
+  suite("mws v2: distinct barrel directions and centred spread")
+  do
+    local g,_,_,a=fixture()
+    local r,h=world(g)
+    h.w.aimX,h.w.aimY=0,1
+    a.props.angle=45 -- a value retained by an older saved Forward module
+    ticks(r,1,true)
+    near("Forward ignores old angle offsets and preserves incoming direction",h.spawned[1].dirY,1)
+    near("Forward adds no sideways component",h.spawned[1].dirX,0)
+    M.set(a,"subclass","directional") M.set(a,"angle",30)
+    r,h=world(g) h.w.aimX,h.w.aimY=0,1 ticks(r,1,true)
+    near("Directional adds its angle to the incoming direction",h.spawned[1].dirX,-0.5)
+    near("Directional offset is relative rather than world-fixed",h.spawned[1].dirY,math.sqrt(3)/2)
+    M.set(a,"angle",0) r,h=world(g) ticks(r,1,true)
+    near("Directional at zero offset behaves like Forward",h.spawned[1].dirX,1)
+    local function names(sub)
+      local out={} for _,p in ipairs(M.props("barrel",sub)) do out[p.name]=true end return out
+    end
+    local forward,directional,spread=names("forward"),names("directional"),names("spread")
+    check("Forward inspector has no angle or spread controls",not forward.angle and not forward.spread)
+    check("Directional exposes angle without irrelevant spread/count controls",directional.angle and not directional.spread and not directional.count)
+    check("Spread exposes its arc without irrelevant count/rotation controls",spread.spread and not spread.count and not spread.rotationSpeed)
+
+    M.set(a,"subclass","spread") M.set(a,"spread",60) M.set(a,"angle",20)
+    r,h=world(g)
+    local rng=12345
+    h.random=function() rng=(rng*16807)%2147483647 return (rng-1)/2147483646 end
+    local input={x=0,y=0,dx=math.cos(math.rad(30)),dy=math.sin(math.rad(30))}
+    local samples,centre,left,right,mean=20000,0,0,0,0
+    local bounded=true
+    for _=1,samples do
+      local packet=r:barrel(r.contexts[1],a,input,"")[1].packet
+      local offset=math.deg(math.atan2(packet.dy,packet.dx))-50
+      mean=mean+offset
+      if offset<0 then left=left+1 else right=right+1 end
+      if math.abs(offset)<=10 then centre=centre+1 end
+      if math.abs(offset)>30+1e-9 then bounded=false end
+    end
+    check("all spread samples remain inside the configured cone",bounded)
+    check("at least 75% of shots land in the central third of the cone",centre/samples>0.75)
+    check("spread is balanced on both sides of its centre",math.abs(left-right)/samples<0.025)
+    near("spread remains centred on incoming direction plus offset",mean/samples,0,0.2)
+    M.set(a,"spread",0)
+    local packet=r:barrel(r.contexts[1],a,input,"")[1].packet
+    near("zero spread stays exactly on its configured centre",math.deg(math.atan2(packet.dy,packet.dx)),50)
+  end
   suite("mws v2: targeting only reachable enemies")
   do
     for _,sub in ipairs({"weakling","bossling","seeking"}) do

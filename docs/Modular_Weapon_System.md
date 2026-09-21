@@ -314,7 +314,7 @@ that behavior explicitly within a graph.
 | Forward | Pass the incoming DOI unchanged. |
 | Directional | Offset direction relative to incoming DOI. |
 | Rotating | Rotate around a point, starting at incoming DOI. |
-| Spread | Choose a random direction within a cone around incoming DOI. |
+| Spread | Choose a random direction within a cone around incoming DOI, favouring the centre with a bell-shaped distribution. |
 | Multi | Fire simultaneously in N > 1 directions centered around incoming DOI. |
 | Alternating | Fire round-robin through N > 1 directions centered around incoming DOI. |
 | Blind | Choose a random direction, discarding incoming DOI. |

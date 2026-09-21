@@ -80,9 +80,14 @@ end
 function R:barrel(ctx,n,p,path)
   local cfg=n.props local mode=cfg.subclass
   local q=copy(p) local count=1
-  local base=math.rad(cfg.angle)
+  local base=math.rad(mode=="forward" and 0 or (cfg.angle or 0))
   if mode=="blind" then base=self.host.random()*math.pi*2-angle(q.dx,q.dy)
-  elseif mode=="spread" then base=base+(self.host.random()-0.5)*math.rad(cfg.spread)
+  elseif mode=="spread" then
+    -- Averaging independent draws gives a smooth, symmetric bell shape with
+    -- hard cone bounds. No clamping that could pile shots up at the edges.
+    local sum=0
+    for _=1,6 do sum=sum+self.host.random() end
+    base=base+(sum/6-0.5)*math.rad(cfg.spread)
   elseif mode=="rotating" then base=base+self.time*math.rad(cfg.rotationSpeed)
   elseif mode=="bounce" then
     if q.nx then
@@ -236,7 +241,8 @@ function R:walk(ctx,n,signal,p,path,payloads)
       for i=1,count do
         local offset=count>1 and ((i-1)/(count-1)-0.5)*math.rad(cfg.spread) or 0
         local k=path..n.id..":"..i.."/"
-        routes[i]={packet=rotate(p,math.rad(cfg.angle)+offset),port=i,path=k}
+        local base=cfg.subclass=="forward" and 0 or (cfg.angle or 0)
+        routes[i]={packet=rotate(p,math.rad(base)+offset),port=i,path=k}
       end
     end
     local hot={}

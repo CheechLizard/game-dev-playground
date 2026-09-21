@@ -77,6 +77,16 @@ dropped; hot signals retry when startup becomes affordable. Exhaustion ends the
 old strike; restart creates a new one. Payload-free strikes still produce events.
 Without a Barrel, firing direction is random and ignores incoming direction.
 
+Forward passes incoming direction unchanged and has no angle setting.
+Directional applies its **Angle offset** relative to incoming direction; 0°
+matches Forward. Barrel inspectors show only settings their subclass uses.
+Old angle values on Forward modules are ignored; use Directional for offsets.
+Spread favours the centre of its configured cone with a symmetric bell-shaped
+distribution. The current bounded approximation averages six uniform samples:
+it never exceeds half the configured Spread arc on either side of the centre,
+and does not clamp excess samples onto the edges. Multi/Alternating still use
+evenly spaced directions. Legacy shop weapon spread is unchanged.
+
 ## Explicit prototype choices and departures
 
 These make unsettled parts testable; they do not amend the design specification.
