@@ -72,6 +72,7 @@ renderer and writes PNGs, with no accessibility permission or desktop control.
 ```
 luajit tools/screenshot.lua hud.png --at 8 --seed 7
 luajit tools/screenshot.lua editor.png --editor Debug
+luajit tools/screenshot.lua dropdown.png --mode bench --at 0 --dropdown mws.n1.subclass
 luajit tools/screenshot.lua zoo.png --mode zoo --press next --press next
 luajit tools/screenshot.lua beam.png --mode bench --seed 7 --at 0.5 --frames 4 --every 0.5 --set bench.prototype=v2_beam --set bench.holdFire=true
 ```
@@ -102,6 +103,7 @@ LÖVE executable; `SCREENSHOT_TIMEOUT` changes that timeout. The existing
 | `--do "<label>"` | run an editor action by its label, repeatable |
 | `--press <action>` | feed an input action — `pause`, `next`, `confirm`… — repeatable |
 | `--editor [page]` | open the editor, optionally on a named page |
+| `--dropdown <widget id>` | open a dropdown for visual inspection, e.g. `mws.n1.subclass` in the bench |
 | `--overlays` / `--perf` | every debug overlay on / the perf panel on |
 | `--hold` | leave the window open after the shot (for `love .` by hand) |
 
@@ -308,6 +310,13 @@ if dd.on.colliders then dd.circle("colliders", x, y, r) end
 ```
 
 ## Headless testing
+
+`luajit tools/test.lua` runs the simulation and framework checks, including Lua
+pointer and keyboard tests against the real UI widgets. The UI suite covers
+dropdown selection and dismissal, scroll clipping, buttons, slider and numeric
+editing, text focus, overlay input blocking, editor navigation, and graph
+dragging, wiring, panning and zooming. These tests use no desktop input. Use the
+screenshot tool as well to check font sizes, clipping and layout in LÖVE.
 
 `run.lua` contains no `love.graphics` calls and takes a movement vector rather
 than reading input, so an entire run can be simulated with no window. That makes

@@ -101,8 +101,16 @@ local pendingKeys = {}
 local cursor = { x = 0, y = 0, w = 200 }
 local scissorStack = {}
 local openDropdown = nil
+local frameNumber = 0
+local pointerBlocked = false
+local requestedDropdown = nil
+local inputBlocks = 0
+local focusSeenFrame = 0
+local requestedFocus = nil
 
 function ui.beginFrame()
+  frameNumber = frameNumber + 1
+  pointerBlocked = openDropdown ~= nil
   syncTheme()
   syncMetrics()
   mouse.prevDown = mouse.down
@@ -110,11 +118,19 @@ function ui.beginFrame()
     mouse.x, mouse.y = love.mouse.getPosition()
     mouse.down = love.mouse.isDown(1)
   end
+  mouse.screenX, mouse.screenY = mouse.x, mouse.y
   hot = nil
 end
 
 function ui.endFrame()
   if not mouse.down then active = nil end
+  if keyboardFocus and focusSeenFrame ~= frameNumber then keyboardFocus, textBuffer = nil, "" end
+  -- Transfer focus after every owner has had a chance to commit its old buffer.
+  -- Doing this inside a widget loses edits when the next field draws first.
+  if requestedFocus then
+    keyboardFocus, textBuffer = requestedFocus.id, requestedFocus.text
+    requestedFocus = nil
+  end
   mouse.wheel = 0
   pendingKeys = {}
 end
@@ -126,10 +142,28 @@ end
 function ui.keypressed(key) pendingKeys[#pendingKeys + 1] = key end
 
 --- True while the editor wants the mouse or keyboard, so the game can ignore them.
-function ui.capturingKeyboard() return keyboardFocus ~= nil end
+function ui.capturingKeyboard() return keyboardFocus ~= nil or openDropdown ~= nil end
 
-local function clicked() return mouse.down and not mouse.prevDown end
-local function released() return not mouse.down and mouse.prevDown end
+-- Panels behind an editor/pause overlay still draw but must not receive input.
+function ui.suspendInput() inputBlocks = inputBlocks + 1 end
+function ui.resumeInput() inputBlocks = math.max(0,inputBlocks - 1) end
+function ui.cancelInteractions()
+  active, keyboardFocus, openDropdown, requestedDropdown = nil,nil,nil,nil
+  requestedFocus, ui.dropdownResult = nil,nil
+  textBuffer, pendingKeys = "", {}
+end
+
+local function trimLastCharacter(value)
+  local first = #value
+  while first > 0 and value:byte(first) >= 128 and value:byte(first) < 192 do first = first - 1 end
+  return value:sub(1,math.max(0,first-1))
+end
+local function backspace() textBuffer = trimLastCharacter(textBuffer) end
+
+local function rawClicked() return mouse.down and not mouse.prevDown end
+local function rawReleased() return not mouse.down and mouse.prevDown end
+local function clicked() return inputBlocks == 0 and not pointerBlocked and rawClicked() end
+local function released() return inputBlocks == 0 and not pointerBlocked and rawReleased() end
 
 local function inside(x, y, w, h)
   return mouse.x >= x and mouse.x < x + w and mouse.y >= y and mouse.y < y + h
@@ -138,9 +172,10 @@ end
 --- Hit test that respects the current scissor, so a widget scrolled out of
 -- view cannot be clicked through its container.
 local function hovered(x, y, w, h)
+  if pointerBlocked or inputBlocks > 0 then return false end
   local clip = scissorStack[#scissorStack]
-  if clip and not (mouse.x >= clip.x and mouse.x < clip.x + clip.w
-                   and mouse.y >= clip.y and mouse.y < clip.y + clip.h) then
+  if clip and not (mouse.screenX >= clip.x and mouse.screenX < clip.x + clip.w
+                   and mouse.screenY >= clip.y and mouse.screenY < clip.y + clip.h) then
     return false
   end
   return inside(x, y, w, h)
@@ -227,7 +262,7 @@ local function ellipsise(str, maxWidth)
   if textWidth(str) <= maxWidth then return str end
   local out = str
   while #out > 1 and textWidth(out .. "...") > maxWidth do
-    out = out:sub(1, #out - 1)
+    out = trimLastCharacter(out)
   end
   return out .. "..."
 end
@@ -370,37 +405,39 @@ local function numericEntry(id, value, min, max, x, y, w, h, readout, integer)
   local focused = keyboardFocus == id
   local over = hovered(x, y, w, h)
   if over then hot = id end
+  local changed = false
+  local function commit()
+    local n = tonumber(textBuffer)
+    if n and n==n and n~=math.huge and n~=-math.huge then
+      n = math.max(min, math.min(max, n))
+      if integer then n = math.floor(n + 0.5) end
+      if n ~= value then value, changed = n, true end
+    end
+    keyboardFocus, focused = nil, false
+  end
 
+  if over and clicked() then active = id end
   if released() then
-    if over and not focused then
-      keyboardFocus = id
-      textBuffer = tostring(value)
-      focused = true
+    if over and not focused and active == id then
+      requestedFocus = { id = id, text = tostring(value) }
     elseif focused and not over then
-      keyboardFocus = nil
-      focused = false
+      commit()
     end
   end
 
-  local changed = false
   if focused then
     for _, key in ipairs(pendingKeys) do
       if key == "backspace" then
-        textBuffer = textBuffer:sub(1, -2)
+        backspace()
       elseif key == "return" or key == "kpenter" or key == "tab" then
         -- Anything unparseable is simply declined; the value stands.
-        local n = tonumber(textBuffer)
-        if n then
-          n = math.max(min, math.min(max, n))
-          if integer then n = math.floor(n + 0.5) end
-          if n ~= value then value, changed = n, true end
-        end
-        keyboardFocus, focused = nil, false
+        commit()
       elseif key == "escape" then
         keyboardFocus, focused = nil, false
       end
     end
   end
+  if keyboardFocus == id then focusSeenFrame = frameNumber end
 
   local shown = readout
   if focused then
@@ -412,7 +449,11 @@ local function numericEntry(id, value, min, max, x, y, w, h, readout, integer)
   -- Keep the tail of a long entry and print it placed, not wrapped: printf
   -- with a width limit spills onto a second line and over the row below.
   local limit = w - ui.unit
-  while #shown > 1 and textWidth(shown) > limit do shown = shown:sub(2) end
+  while #shown > 1 and textWidth(shown) > limit do
+    local first = 2
+    while first <= #shown and shown:byte(first) >= 128 and shown:byte(first) < 192 do first = first + 1 end
+    shown = shown:sub(first)
+  end
   love.graphics.setColor(ui.theme.accent)
   love.graphics.print(shown, x + w - ui.unit / 2 - textWidth(shown), textY(y, h))
   return value, changed, focused
@@ -448,7 +489,7 @@ function ui.slider(id, label, value, min, max, opts)
     dragStart.value = value
   end
 
-  if active == id and mouse.down then
+  if active == id and mouse.down and inputBlocks == 0 and not pointerBlocked then
     local span = max - min
     local perPixel = span / math.max(1, w)
     -- Hold shift for fine control.
@@ -533,9 +574,20 @@ function ui.dropdown(id, label, value, values, opts)
 
   local over = hovered(bx, y, boxW, h)
   if over then hot = id end
-  if over and released() then
-    openDropdown = (openDropdown and openDropdown.id == id) and nil
-      or { id = id, x = bx, y = y + h, w = boxW, values = values, value = value }
+  if over and clicked() then active = id end
+  if (over and released() and active == id) or requestedDropdown == id then
+    local sx, sy = love.graphics.transformPoint(bx, y)
+    openDropdown = { id = id, x = sx, y = sy + h, headerY = sy,
+      w = boxW, values = values, value = value, openedFrame = frameNumber, first = 1 }
+    requestedDropdown = nil
+    pointerBlocked = true
+  end
+  if openDropdown and openDropdown.id == id then
+    openDropdown.seenFrame = frameNumber
+    openDropdown.font = love.graphics.getFont()
+    local sx,sy = love.graphics.transformPoint(bx,y)
+    openDropdown.x, openDropdown.y, openDropdown.headerY = sx,sy+h,sy
+    openDropdown.w, openDropdown.values, openDropdown.value = boxW,values,value
   end
 
   rect("fill", bx, y, boxW, h, over and ui.tone.raised or nil)
@@ -558,30 +610,65 @@ end
 function ui.drawDeferred()
   if not openDropdown then return end
   local d = openDropdown
+  if d.seenFrame ~= frameNumber then openDropdown = nil return end
+  for _,key in ipairs(pendingKeys) do
+    if key == "escape" then openDropdown = nil return end
+  end
+  local previousFont = love.graphics.getFont()
+  love.graphics.setFont(d.font)
   local h = ui.rowHeight
-  local total = #d.values * h + ui.unit
+  local ww, wh = love.graphics.getDimensions()
+  for _,option in ipairs(d.values) do d.w = math.max(d.w,textWidth(tostring(option))+ui.pad*2) end
+  d.w = math.min(d.w,ww-ui.pad*2)
+  local rows = math.min(#d.values, math.max(1, math.floor((wh-ui.pad*2-ui.unit)/h)))
+  d.first = math.max(1,math.min(#d.values-rows+1,d.first))
+  local total = rows * h + ui.unit
+  d.x = math.max(ui.pad, math.min(d.x, ww-d.w-ui.pad))
+  if d.y + total > wh-ui.pad then d.y = math.max(ui.pad, d.headerY-total) end
+  if inside(d.x,d.y,d.w,total) and mouse.wheel ~= 0 then
+    local amount = (d.wheelRemainder or 0) + mouse.wheel
+    local steps = amount < 0 and math.ceil(amount) or math.floor(amount)
+    d.wheelRemainder = amount - steps
+    d.first = math.max(1,math.min(#d.values-rows+1,d.first-steps))
+    d.pressed = nil
+    mouse.wheel = 0
+  end
   rect("fill", d.x, d.y, d.w, total, ui.theme.panel)
   love.graphics.setColor(ui.theme.line)
   love.graphics.rectangle("line", d.x + 0.5, d.y + 0.5, d.w - 1, total - 1)
-  for i, option in ipairs(d.values) do
-    local oy = d.y + ui.unit / 2 + (i - 1) * h
+  for i = d.first, d.first + rows - 1 do
+    local option = d.values[i]
+    local oy = d.y + ui.unit / 2 + (i - d.first) * h
     local over = inside(d.x, oy, d.w, h)
-    if over then rect("fill", d.x, oy, d.w, h, ui.tone.raised) end
+    if over then rect("fill", d.x, oy, d.w, h, ui.theme.accent) end
     text(ellipsise(tostring(option), d.w - ui.pad), d.x + ui.unit, textY(oy, h),
-      option == d.value and ui.theme.accent or ui.theme.fg)
-    if over and released() then
+      over and ui.theme.background or (option == d.value and ui.theme.accent or ui.theme.fg))
+    if over and rawClicked() then d.pressed = i end
+    if over and rawReleased() and d.pressed == i and d.openedFrame < frameNumber then
       ui.dropdownResult = { id = d.id, value = option }
       openDropdown = nil
     end
   end
+  if rows < #d.values then
+    local track = total-ui.unit
+    local thumb = math.max(ui.unit,track*rows/#d.values)
+    local y = d.y+ui.unit/2+(track-thumb)*(d.first-1)/(#d.values-rows)
+    rect("fill",d.x+d.w-ui.unit,y,ui.unit/2,thumb,ui.theme.accent)
+  end
   -- Clicking anywhere else dismisses the list.
-  if openDropdown and released()
+  if openDropdown and rawReleased() and d.openedFrame < frameNumber
      and not inside(d.x, d.y, d.w, total) then
     openDropdown = nil
   end
+  if rawReleased() then d.pressed = nil end
+  love.graphics.setFont(previousFont)
 end
 
 function ui.dropdownOpen() return openDropdown ~= nil end
+
+-- Capture can request a visible widget by id without OS input or accessibility.
+-- It follows the same opening/layout path as a mouse click.
+function ui.requestDropdown(id) requestedDropdown = id end
 
 --- Colour editor: a swatch plus three channel sliders.
 function ui.color(id, label, value)
@@ -621,11 +708,11 @@ function ui.textField(id, label, value, opts)
 
   local over = hovered(bx, y, boxW, h)
   if over then hot = id end
+  if over and clicked() then active = id end
   if released() then
     if over then
-      if keyboardFocus ~= id then
-        keyboardFocus = id
-        textBuffer = value or ""
+      if keyboardFocus ~= id and active == id then
+        requestedFocus = { id = id, text = value or "" }
       end
     elseif keyboardFocus == id then
       keyboardFocus = nil
@@ -637,7 +724,7 @@ function ui.textField(id, label, value, opts)
   if keyboardFocus == id then
     for _, key in ipairs(pendingKeys) do
       if key == "backspace" then
-        textBuffer = textBuffer:sub(1, -2)
+        backspace()
       elseif key == "return" or key == "kpenter" then
         keyboardFocus = nil
         value = textBuffer
@@ -648,6 +735,8 @@ function ui.textField(id, label, value, opts)
       end
     end
   end
+
+  if keyboardFocus == id then focusSeenFrame = frameNumber end
 
   local shown = (keyboardFocus == id) and textBuffer or (value or "")
   love.graphics.setColor(keyboardFocus == id and ui.theme.accent or ui.theme.line)
@@ -662,13 +751,16 @@ end
 -- ----------------------------------------------------------------- scrolling
 
 local scrollOffsets = {}
+local scrollLimits = {}
 
 --- Begin a clipped, scrollable region. Returns the inner content width.
 function ui.beginScroll(id, x, y, w, h)
   local offset = scrollOffsets[id] or 0
   if hovered(x, y, w, h) and mouse.wheel ~= 0 then
     offset = offset - mouse.wheel * (ui.rowHeight + ui.rowGap) * 1.5
+    mouse.wheel = 0
   end
+  offset = math.max(0,math.min(scrollLimits[id] or 0,offset))
 
   scissorStack[#scissorStack + 1] = { x = x, y = y, w = w, h = h }
   love.graphics.push()
@@ -692,6 +784,7 @@ function ui.endScroll(id, x, y, w, h)
   table.remove(scissorStack)
 
   local maxOffset = math.max(0, contentHeight - h + ui.pad)
+  scrollLimits[id] = maxOffset
   if offset > maxOffset then offset = maxOffset end
   if offset < 0 then offset = 0 end
   scrollOffsets[id] = offset
@@ -711,13 +804,13 @@ end
 
 function ui.resetScroll(id) scrollOffsets[id] = 0 end
 
-function ui.mouseInside(x, y, w, h) return inside(x, y, w, h) end
+function ui.mouseInside(x, y, w, h) return inputBlocks == 0 and not pointerBlocked and inside(x, y, w, h) end
 function ui.mousePos() return mouse.x, mouse.y end
 
 -- Raw mouse state, for surfaces that are not a stack of rows: the node canvas
 -- drags boxes and pulls wires, which no widget here can express. Everything
 -- built out of rows should keep using the widgets rather than these.
-function ui.mouseDown() return mouse.down end
+function ui.mouseDown() return inputBlocks == 0 and not pointerBlocked and mouse.down end
 function ui.mouseClicked() return clicked() end
 function ui.mouseReleased() return released() end
 function ui.wheel() return mouse.wheel end
@@ -729,7 +822,7 @@ end
 
 --- Keys pressed this frame that no text field has claimed.
 function ui.keysPressed()
-  if keyboardFocus then return {} end
+  if inputBlocks > 0 or keyboardFocus or openDropdown then return {} end
   return pendingKeys
 end
 

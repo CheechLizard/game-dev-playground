@@ -34,6 +34,7 @@ local benchState = nil
 
 --- Enter a level outright. `next` is "run", "zoo", "range" or "bench".
 local function enterMode(next)
+  ui.cancelInteractions()
   mode = next
   render.underlay = nil
   sandboxState, benchState = nil, nil
@@ -405,7 +406,9 @@ end
 
 function game.drawScreenOverlay(scale, ox, oy)
   if benchState then
+    if paused then ui.suspendInput() end
     bench.drawOverlay(benchState, scale, ox, oy)
+    if paused then ui.resumeInput() end
     if paused then drawPauseMenu(scale, ox, oy)
     elseif game.isPaused() then hud.drawPaused(scale, ox, oy) end
     return

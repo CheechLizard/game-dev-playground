@@ -35,7 +35,7 @@ is the main merge-conflict hotspot when branches run in parallel.
 
 ```bash
 love .                       # run — from the repo root, never a subdirectory
-luajit tools/test.lua        # 132 tests, ~5s
+luajit tools/test.lua        # simulation, framework and UI regression tests
 luajit tools/balance.lua --runs 6
 luajit tools/screenshot.lua hud.png --at 8 --seed 7
 ```
@@ -76,8 +76,8 @@ Use `--frames 4 --every 0.5` to inspect a series from the same simulation.
 The Lua launcher uses direct process arguments, enforces a timeout and verifies
 each PNG. `tools/capture.sh` remains a single-shot convenience.
 
-Take one after any change to a drawn surface and *look at it*. The tests cover
-the simulation and cannot see a widget drawn at the wrong scale, text
+Take one after any change to a drawn surface and *look at it*. Headless tests cover
+simulation and UI interactions, but cannot see a widget drawn at the wrong scale, text
 overlapping a panel, or a screen-space overlay landing in the wrong place —
 every bug found in the draw path so far has been found this way.
 

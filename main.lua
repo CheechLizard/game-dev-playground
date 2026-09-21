@@ -137,11 +137,14 @@ function love.draw()
 
   -- Screen-space overlays sit on top of the scaled canvas, unpixelated, so
   -- text stays readable at any window size.
+  if editor.open then ui.suspendInput() end
   game.drawScreenOverlay(scale, offsetX, offsetY)
+  if editor.open then ui.resumeInput() end
   if config.values.perf.show then
     perf.draw(love.graphics.getWidth() - perf.panelWidth() - 8, 8, ui.theme)
   end
   editor.draw()
+  ui.drawDeferred()
   ui.endFrame()
 
   -- The frame is finished, so this is the only point a screenshot of it can

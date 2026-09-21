@@ -273,6 +273,10 @@ do
   check("--editor does not eat the next flag", plan.perf)
   eq("--editor page", capture.parse({ "--capture", "a", "--editor", "Debug" }).editorPage,
     "Debug")
+  eq("--dropdown widget", capture.parse({"--capture","a","--dropdown","mws.n1.subclass"}).dropdown,
+    "mws.n1.subclass")
+  check("--dropdown requires an id",not capture.parse({"--capture","a","--dropdown"}))
+  check("--dropdown requires a capture",not capture.parse({"--dropdown","test"}))
 
   -- The launcher passes its own flags through the same table.
   plan = capture.parse({ "--game", "horde-survivor", "--capture", "a", "--at", "3" })
@@ -304,6 +308,11 @@ do
 end
 
 -- ------------------------------------------------------------------- mws
+
+local uiOk,uiErr=pcall(function()
+  require("tools.uisuite").run(suite,check,eq,near)
+end)
+if not uiOk then suite("ui") check("widget suite completed",false,uiErr) end
 
 local v2Ok,v2Err=pcall(function()
   require("tools.mwsv2suite").run(suite,check,eq,near)

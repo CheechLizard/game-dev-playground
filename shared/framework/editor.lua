@@ -82,6 +82,7 @@ function editor.pageNames()
 end
 
 function editor.toggle()
+  ui.cancelInteractions()
   editor.open = not editor.open
   if editor.open and not editor.page then
     editor.page = editor.pageNames()[1]
@@ -384,7 +385,9 @@ function editor.draw()
 
   -- ---- sidebar
   local names = editor.pageNames()
-  ui.layout(6, headerH + 6, sidebar - 12)
+  local sidebarY = headerH + 6
+  local sidebarH = screenH - sidebarY - (lineH + 10)
+  ui.beginScroll("editor.sidebar", 0, sidebarY, sidebar, sidebarH)
   for _, name in ipairs(names) do
     if ui.button("page." .. name, name, { selected = (name == editor.page) }) then
       editor.page = name
@@ -396,6 +399,7 @@ function editor.draw()
   ui.space(8)
   local helpValue, helpChanged = ui.toggle("editor.help", "Show help", editor.showHelp or false)
   if helpChanged then editor.showHelp = helpValue end
+  ui.endScroll("editor.sidebar", 0, sidebarY, sidebar, sidebarH)
 
   -- ---- search
   local searchY = headerH + 6
@@ -440,7 +444,7 @@ function editor.draw()
       width - 16), 8, footerY + 5)
   end
 
-  ui.drawDeferred()
+  -- The launcher draws dropdowns after all panels.
   g.setColor(1, 1, 1, 1)
   if previousFont then g.setFont(previousFont) end
 end

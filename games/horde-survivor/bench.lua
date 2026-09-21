@@ -417,8 +417,7 @@ function bench.drawOverlay(s, scale, ox, oy)
   if flowchart.inspector(s.view, g, innerW, { showHelp = s.showHelp }) then rearm(s) end
   ui.endScroll("bench.inspector", canvasW + 1, listY, inspectW - 1, listH)
 
-  -- An open dropdown draws last, or the panel it came from clips it.
-  ui.drawDeferred()
+  -- The launcher draws dropdowns after all panels.
   gfx.setColor(1, 1, 1, 1)
 end
 

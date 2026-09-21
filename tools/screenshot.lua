@@ -12,6 +12,7 @@ if not arg[1] or arg[1]=="--help" then
   --mode bench --at 2 --seed 7 --set bench.holdFire=true
   --frames 4 --every 0.5     writes output-001.png through output-004.png
   --editor Levels          captures the in-game editor too
+  --dropdown mws.n1.subclass  opens the bench trigger menu for inspection
 Uses the game's Lua renderer only. Run from the checkout root.
 LOVE_BIN overrides the LÖVE executable; SCREENSHOT_TIMEOUT defaults to 60 seconds.]])
   os.exit(arg[1] and 0 or 1)

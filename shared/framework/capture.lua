@@ -119,6 +119,10 @@ function capture.parse(args)
       local v, err = value()
       if not v then return nil, err end
       p.presses[#p.presses + 1] = v
+    elseif a == "--dropdown" then
+      local v,err=value()
+      if not v then return nil,err end
+      p.dropdown=v
     elseif a == "--editor" then
       p.editor = true
       local next = args[i + 1]
@@ -140,7 +144,7 @@ function capture.parse(args)
     -- Catch the flags that only mean something alongside --capture rather
     -- than silently ignoring a command line that asked for a screenshot.
     for _, flag in ipairs({ "--at", "--seed", "--mode", "--set", "--do",
-        "--press", "--editor", "--overlays", "--perf", "--hold", "--frames", "--every" }) do
+        "--press", "--editor", "--overlays", "--perf", "--hold", "--frames", "--every", "--dropdown" }) do
       for _, a in ipairs(args or {}) do
         if a == flag then
           return nil, flag .. " only means something with --capture"
@@ -332,6 +336,7 @@ function capture.advance(step, ctx)
       end
     end
   end
+  if plan.dropdown then require("framework.ui").requestDropdown(plan.dropdown) end
   return true
 end
 
