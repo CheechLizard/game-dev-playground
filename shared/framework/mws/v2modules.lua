@@ -57,7 +57,7 @@ define("striker", "STK", "Creates colliders and emits Hit / Complete; requires e
     number("speed", "Speed", 150, 0, 500, "px/s"),
     number("range", "Range / reach", 180, 5, 500, "px"),
     number("duration", "Max duration", 3, 0.05, 20, "s"),
-    number("radius", "Collider radius", 3, 1, 60, "px"),
+    number("radius", "Collider radius", 3, 1, 20, "px"),
     int("hitLimit", "Piercing hit limit", 4, 2, 30),
     number("arc", "Sweep / area arc", 120, 1, 360, "deg"),
     number("orbitRadius", "Orbit radius", 35, 2, 120, "px"),
