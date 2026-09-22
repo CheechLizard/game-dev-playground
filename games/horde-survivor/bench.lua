@@ -65,7 +65,27 @@ local function fitArena(s)
   -- against a full-height arena and then clamped out of the strip.
   if not s.placed then
     s.placed = true
-    r.player.x, r.player.y = r.arenaW * 0.5, r.arenaH * 0.5
+    r.player.x, r.player.y = r.arenaW / 6, r.arenaH * 0.5
+    r.player.facingX, r.player.facingY = 1, 0
+  end
+end
+
+-- Leave a clear firing lane: targets occupy the right third of the arena.
+local function targetBounds(r,inset)
+  local left=r.arenaW*2/3
+  local padX=math.min(inset,(r.arenaW-left)/2)
+  local padY=math.min(inset,r.arenaH/2)
+  return left+padX,r.arenaW-padX,padY,r.arenaH-padY
+end
+
+local function confineTargets(r)
+  for _,e in ipairs(r.enemies) do
+    local left,right,top,bottom=targetBounds(r,e.radius)
+    local x=math.max(left,math.min(right,e.x))
+    local y=math.max(top,math.min(bottom,e.y))
+    if x~=e.x then e.vx=0 end
+    if y~=e.y then e.vy=0 end
+    e.x,e.y=x,y
   end
 end
 
@@ -175,11 +195,13 @@ function bench.update(s, dt, moveX, moveY)
   s.spawnTimer = s.spawnTimer - dt
   if s.spawnTimer <= 0 and #r.enemies < target then
     s.spawnTimer = 0.35
-    local margin = 16
+    local left,right,top,bottom=targetBounds(r,16)
     r:spawnEnemy(c.bench.dummy,
-      margin + r.rng.next() * (r.arenaW - margin * 2),
-      margin + r.rng.next() * (r.arenaH - margin * 2))
+      left+r.rng.next()*(right-left),
+      top+r.rng.next()*(bottom-top))
   end
+  -- Also handle resized arenas and colliders larger than the spawn inset.
+  confineTargets(r)
 
   if s.graph and s.graph.version==2 then
     s.accumulator=s.accumulator+dt
@@ -187,12 +209,11 @@ function bench.update(s, dt, moveX, moveY)
       s.accumulator=s.accumulator-1/60
       r.fireSignal=input.sampleFire() or c.bench.holdFire
       r:update(1/60,moveX,moveY)
+      confineTargets(r)
     end
-  else r.fireSignal=nil r:update(dt, moveX, moveY) end
-
-  for _, e in ipairs(r.enemies) do
-    e.x = math.max(e.radius, math.min(r.arenaW - e.radius, e.x))
-    e.y = math.max(e.radius, math.min(r.arenaH - e.radius, e.y))
+  else
+    r.fireSignal=nil r:update(dt,moveX,moveY)
+    confineTargets(r)
   end
 end
 

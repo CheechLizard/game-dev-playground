@@ -147,7 +147,7 @@ and Chain trigger below must not be used as definitions for the revised design.
 | **Arsenal** | The game's side of MWS: the extra module properties this game needs (crit, knockback, pierce), graph loading and saving, and the host adapter. The seam between the specification and the game. | `games/horde-survivor/arsenal.lua` |
 | **Host** | What the runtime calls into: `wielder`, `aim`, `spawn`, `payload`, `effect`, `emit`. The whole contract between a graph and a game. | `arsenal.host` |
 | **Modifier** | The hook through which weapon level and player bonuses reach a graph, read per property. The graph itself is never rewritten, so the bench edits the same table the run is firing. | `arsenal.modifier`, `runtime:prop` |
-| **Bench** | The inspection level for weapon graphs. `F8`. The player fires in an arena across the top; the graph is a flowchart underneath, edited live. | `games/horde-survivor/bench.lua` |
+| **Bench** | The inspection level for weapon graphs. `F8`. The player starts on the left facing targets confined to the right third of the top arena; the graph is a flowchart underneath, edited live. | `games/horde-survivor/bench.lua` |
 | **Tile** | One module on the canvas: 48px, an icon and a three-letter tag. Its numbers are in the inspector, because a module's properties on its box make a six-module weapon wider than any panel it must fit in. | `flowchart.NODE` |
 
 ## Tooling

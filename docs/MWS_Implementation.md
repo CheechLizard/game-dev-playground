@@ -12,6 +12,8 @@ Run `love .` from `~/Dev/game-dev-playground/main`, then press **F8**.
 The first eight bench weapons are v2 prototypes; **comma / period** cycles weapons.
 The editor's **Levels → Bench → Prototype** setting also selects them.
 
+The player starts on the left, facing right. Targets spawn and remain within
+the right third of the bench arena, leaving a clear firing lane.
 Bench enemies stay still by default so weapon movement is visible. Their AI,
 separation and knockback are paused; hit detection, damage and replacement of
 defeated targets still work. Disable **Levels → Bench → Dummies hold still** for
