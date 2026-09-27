@@ -97,6 +97,13 @@ it never exceeds half the configured Spread arc on either side of the centre,
 and does not clamp excess samples onto the edges. Multi/Alternating still use
 evenly spaced directions. Legacy shop weapon spread is unchanged.
 
+Seeking, Weakling and Bossling expose **Turn speed** in degrees/sec (default
+180; 0 means instant). Target selection and aiming update every simulation tick,
+including between pulses. An active beam turns as soon as its target changes;
+it keeps its age, hit count and funded strike. Sustained strikes follow this aim,
+including downstream split offsets. Projectiles keep their launch direction.
+Delay captures upstream direction; put Seeking after Delay to aim on execution.
+
 ## Explicit prototype choices and departures
 
 These make unsettled parts testable; they do not amend the design specification.
@@ -137,7 +144,8 @@ These make unsettled parts testable; they do not amend the design specification.
    Stab/Sweep/Area/Orbit maintain one per execution route, including all children
    of a split. A finished child never restarts while its siblings remain active.
    Release ends sustained strikes only when their setting enables it. Active initial direction stays
-   fixed except Sweep/Orbit motion. Root sustained origins follow the wielder;
+   fixed except Sweep/Orbit motion and continuous targeting by Seeking/Weakling/
+   Bossling. Root sustained origins follow the wielder;
    event and delayed origins remain at their captured location.
 6. **Events:** hits count distinct targets per collider, including beams/fields.
    Sharp/Impact apply once per target; Plasma continues while overlapping.
@@ -168,8 +176,12 @@ These make unsettled parts testable; they do not amend the design specification.
    and speed × duration, Stab/Sweep use reach, Area uses collider radius, and
    Orbit uses its annulus. Collider/target radii count at the boundary. This is
    a geometric filter, not a prediction of available energy or target movement.
-   With no eligible target, incoming DOI is preserved and a hot signal still
-   fires if startup is affordable.
+   With no eligible target, aim turns back toward incoming DOI and a hot signal
+   still fires if startup is affordable. A targeting Barrel starts aiming from
+   incoming DOI; changing targets has no acquisition delay. The 180 degrees/sec
+   default is provisional tuning. Shared split lanes advance their upstream aim
+   only once per tick. Delayed headings stay captured rather than retaining a
+   live reference to upstream aim.
 9. **Scope:** Instant/Ammo/Constant/Timer Batteries, Drone, Oscillating/Zig-zag and
    multi-input Barrels, and Burning/Corrosive/Freezing/Black-hole Payloads remain
    unimplemented and absent from the palette. Old saved graphs/shop weapons

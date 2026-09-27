@@ -97,7 +97,7 @@ function tests.run(suite,check,eq,near)
     for _,sub in ipairs({"weakling","bossling","seeking"}) do
       for _,after in ipairs({false,true}) do
         local g,_,b,a,s=fixture("single","ranged",{striker={range=20,speed=60,duration=3}})
-        M.set(a,"subclass",sub)
+        M.set(a,"subclass",sub) M.set(a,"turnSpeed",0)
         if after then
           G.disconnect(g,b.id,1) G.disconnect(g,a.id,1)
           wire(g,b,s) wire(g,s,a)
@@ -109,20 +109,20 @@ function tests.run(suite,check,eq,near)
       end
     end
     local g,_,_,a=fixture("single","ranged",{striker={range=200,speed=10,duration=1}})
-    M.set(a,"subclass","weakling")
+    M.set(a,"subclass","weakling") M.set(a,"turnSpeed",0)
     local close,far=target(0,5),target(50,0) close.hp=50 far.hp=1
     local r,h=world(g,{far,close}) ticks(r,1,true)
     near("projectile targeting also respects travel before duration expires",h.spawned[1].dirY,1)
     for _,mode in ipairs({"stab","sweep","area","orbit"}) do
       local shaped,_,_,barrel=fixture("single",mode,{striker={range=20,radius=2,orbitRadius=20}})
-      M.set(barrel,"subclass","bossling")
+      M.set(barrel,"subclass","bossling") M.set(barrel,"turnSpeed",0)
       local nearEnemy,farEnemy=target(0,mode=="area" and 1 or 20),target(100,0)
       nearEnemy.hp=50 farEnemy.hp=100
       local rt,host=world(shaped,{farEnemy,nearEnemy}) ticks(rt,1,true)
       near(mode.." targeting uses its collider reach",host.spawned[1].packet.dy,1)
     end
     local scoped,_,_,barrel,striker=fixture("single","ranged",{striker={range=20}})
-    M.set(barrel,"subclass","weakling")
+    M.set(barrel,"subclass","weakling") M.set(barrel,"turnSpeed",0)
     local _,_,field=downstream(scoped,striker,"complete") M.set(field,"radius",60)
     local closeEnemy,farEnemy=target(0,10),target(50,0) closeEnemy.hp=50 farEnemy.hp=1
     local rt,host=world(scoped,{farEnemy,closeEnemy}) ticks(rt,1,true)
@@ -130,6 +130,107 @@ function tests.run(suite,check,eq,near)
     local outside=target(100,0)
     local rt2,host2=world(scoped,{outside}) host2.w.aimX=0 host2.w.aimY=1 ticks(rt2,1,true)
     near("no reachable target preserves incoming direction",host2.spawned[1].dirY,1)
+  end
+  suite("mws v2: continuous targeting and bounded aiming")
+  do
+    local function heading(s) return math.deg(math.atan2(s.dirY,s.dirX)) end
+    for _,sub in ipairs({"seeking","weakling","bossling"}) do
+      for _,after in ipairs({false,true}) do
+        local g,_,b,a,s=fixture("single","stab",{striker={duration=12}})
+        M.set(a,"subclass",sub) M.set(a,"turnSpeed",90)
+        if after then
+          G.disconnect(g,b.id,1) G.disconnect(g,a.id,1)
+          wire(g,b,s) wire(g,s,a)
+        end
+        local first,second=target(5),target(0,10)
+        second.hp=sub=="bossling" and 50 or 150
+        local r,h=world(g,{first,second}) ticks(r,1,true)
+        local beam=h.spawned[1]
+        near(sub.." starts on its first target",heading(beam),0)
+        first.dead=true ticks(r,1,false)
+        near(sub.." starts turning on the next tick, even after a single pulse",heading(beam),1.5)
+        ticks(r,29,false)
+        near(sub.." turns through intermediate angles at the configured speed",heading(beam),45)
+        ticks(r,30,false)
+        near(sub.." reaches its new target in one second",heading(beam),90)
+        eq(sub.." retargets the same active beam",#h.spawned,1)
+        eq(sub.." aiming never completes/restarts the strike",r.stats.completed,0)
+        eq(sub.." collisions follow the new beam direction",r.stats.hits,2)
+        near(sub.." turning does not spend another startup",r.sequences[1].energy,99)
+        second.x,second.y=200,0 ticks(r,1,false)
+        near(sub.." abandons an out-of-range target and turns toward incoming aim",heading(beam),88.5)
+      end
+    end
+    for _,after in ipairs({false,true}) do
+      local g,_,b,a,s=fixture("repeater","piercing",{
+        trigger={periodTicks=60},striker={range=200,speed=10,duration=20}})
+      M.set(a,"subclass","seeking") M.set(a,"turnSpeed",90)
+      if after then
+        G.disconnect(g,b.id,1) G.disconnect(g,a.id,1)
+        wire(g,b,s) wire(g,s,a)
+      end
+      local first,second=target(10),target(0,20)
+      local r,h=world(g,{first,second}) ticks(r,1,true)
+      first.dead=true ticks(r,60,true)
+      eq("aiming between pulses does not add firing opportunities",#h.spawned,2)
+      near("a fired projectile retains its launch direction",heading(h.spawned[1]),0)
+      near("aim advances throughout the cold interval between shots",heading(h.spawned[2]),90)
+    end
+    local g,_,_,a,s=fixture("single","stab")
+    M.set(a,"subclass","seeking") M.set(a,"turnSpeed",60)
+    local r,h=world(g,{target(10*math.cos(math.rad(-179)),10*math.sin(math.rad(-179)))})
+    h.w.aimX,h.w.aimY=math.cos(math.rad(179)),math.sin(math.rad(179))
+    ticks(r,2,true)
+    near("aim crosses the angle boundary by the short path",heading(h.spawned[1]),-179)
+
+    -- A split shares the upstream aim clock, retaining each lane's offsets.
+    g,_,_,a,s=fixture("single","stab")
+    M.set(a,"subclass","seeking") M.set(a,"turnSpeed",90)
+    local split=node(g,"barrel","multi",{count=3,spread=60}) wire(g,s,split)
+    local offset=node(g,"barrel","directional",{angle=10}) wire(g,split,offset)
+    local first,second=target(5),target(0,10)
+    r,h=world(g,{first,second}) ticks(r,1,true) first.dead=true ticks(r,1,false)
+    for i=1,3 do
+      near("split lane "..i.." keeps its offsets without multiplying turn speed",heading(h.spawned[i]),(i-2)*30+11.5)
+    end
+    eq("turning a split keeps one logical strike",r.stats.fired,1)
+
+    -- Delaying a heading captures it; downstream Seeking can aim afresh.
+    g,_,_,a,s=fixture("single","stab")
+    M.set(a,"subclass","seeking") M.set(a,"turnSpeed",90)
+    local delay=node(g,"trigger","delay",{delayTicks=10})
+    G.disconnect(g,a.id,1) wire(g,a,delay) wire(g,delay,s)
+    first,second=target(5),target(0,10)
+    r,h=world(g,{first,second}) ticks(r,1,true) first.dead=true ticks(r,20,false)
+    near("Delay retains the original heading instead of a live steering reference",heading(h.spawned[1]),0)
+    eq("Delay emits only its supplied pulse while upstream aim moves",#h.spawned,1)
+
+    local t,b
+    g,t,b,a=fixture("toggle","stab")
+    M.set(a,"subclass","seeking") M.set(a,"turnSpeed",90)
+    delay=node(g,"trigger","delay",{delayTicks=5})
+    G.disconnect(g,t.id,1) wire(g,t,delay) wire(g,delay,b)
+    first,second=target(5),target(0,10)
+    r,h=world(g,{first,second}) ticks(r,6,true)
+    h.w.x=100 first.dead=true ticks(r,10,false)
+    near("a delayed beam keeps targeting from its captured origin",heading(h.spawned[1]),15)
+    near("new delayed packets cannot relocate an existing beam",h.spawned[1].x,0)
+    eq("retargeting a delayed beam does not restart it",#h.spawned,1)
+
+    g,_,_,a=fixture("single","stab")
+    M.set(a,"subclass","seeking") M.set(a,"turnSpeed",90)
+    r,h=world(g,{target(0,10)}) ticks(r,60,false)
+    eq("aiming with a cold trigger never starts a strike",r.stats.fired,0)
+    ticks(r,1,true)
+    near("the first shot uses aim acquired while cold",heading(h.spawned[1]),90)
+    eq("the targeting module declares the editable default turn speed",M.defaults("barrel","seeking").turnSpeed,180)
+    eq("Forward does not acquire an irrelevant turn-speed setting",M.defaults("barrel","forward").turnSpeed,nil)
+    local saved=G.toTable(g)
+    for _,raw in ipairs(saved.nodes) do raw.props.turnSpeed=nil end
+    local restored,dropped=G.fromTable(saved)
+    r,h=world(restored,{target(0,10)}) ticks(r,1,true)
+    near("older saved weapons acquire the default turn speed",heading(h.spawned[1]),3)
+    eq("older saved targeting graphs retain all their properties",#dropped,0)
   end
   suite("mws v2: released fire stays quiet")
   do

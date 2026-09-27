@@ -13,7 +13,11 @@ end
 local function angle(x,y) return math.atan2(y,x) end
 local function rotate(p,a)
   local q=copy(p) local b=angle(p.dx,p.dy)+a
+  if p.steering then q.steering={source=p.steering,offset=a} end
   q.dx,q.dy=math.cos(b),math.sin(b) q.aimed=true return q
+end
+local function seeks(mode)
+  return mode=="seeking" or mode=="weakling" or mode=="bossling"
 end
 
 function R.new(g,host)
@@ -31,7 +35,7 @@ function R:clear()
   self.strikes={} self.groups={} self.contexts={} self.pending={}
 end
 function R:context(seq,event)
-  local c={seq=seq,event=event,age=0,states={},buffers={},routes={},active={},lastHot=0}
+  local c={seq=seq,event=event,age=0,states={},buffers={},routes={},aims={},active={},lastHot=0}
   self.contexts[#self.contexts+1]=c return c
 end
 function R:rebuild()
@@ -78,11 +82,54 @@ function R:inTargetRange(n,p,e)
   end
   return false
 end
+-- Aiming is independent of firing cadence and strike lifetime. One state per
+-- barrel execution route turns at most once per tick, including split beams.
+-- Prototype policy: targeting steers sustained colliders and future launches;
+-- projectiles already in flight retain their launch direction.
+function R:aimAngle(steering,x,y)
+  local state=steering.state
+  if state and state.tick==self.time then return state.angle end
+  local incoming=steering.source and self:aimAngle(steering.source,x,y) or steering.fallback
+  if not state then
+    if steering.normal then
+      local nx,ny=steering.normal[1],steering.normal[2]
+      local dx,dy=math.cos(incoming),math.sin(incoming)
+      local dot=dx*nx+dy*ny
+      return angle(dx-2*dot*nx,dy-2*dot*ny)
+    end
+    return incoming+steering.offset
+  end
+  local n=steering.node local mode=n.props.subclass
+  local best,score
+  for _,e in ipairs(self.host.enemies()) do
+    if not e.dead and self:inTargetRange(n,{x=x,y=y},e) then
+      local value=(e.x-x)^2+(e.y-y)^2
+      if mode=="weakling" then value=e.hp elseif mode=="bossling" then value=-e.hp end
+      if not score or value<score then best,score=e,value end
+    end
+  end
+  local desired=best and angle(best.x-x,best.y-y) or incoming
+  local current=state.angle or incoming
+  local delta=(desired-current+math.pi)%(2*math.pi)-math.pi
+  local speed=n.props.turnSpeed
+  local limit=math.rad(speed)*STEP
+  state.angle=speed==0 and desired or current+math.max(-limit,math.min(limit,delta))
+  state.angle=(state.angle+math.pi)%(2*math.pi)-math.pi
+  state.target,state.tick=best,self.time
+  return state.angle
+end
+function R:refreshAim(packet)
+  if not packet.steering then return end
+  local x,y=packet.x,packet.y
+  if not packet.fixed then local w=self.host.wielder() x,y=w.x,w.y end
+  return self:aimAngle(packet.steering,x,y)
+end
 function R:barrel(ctx,n,p,path)
   local cfg=n.props local mode=cfg.subclass
   local q=copy(p) local count=1
   local base=math.rad(mode=="forward" and 0 or (cfg.angle or 0))
-  if mode=="blind" then base=self.host.random()*math.pi*2-angle(q.dx,q.dy)
+  if mode=="blind" then
+    base=self.host.random()*math.pi*2-angle(q.dx,q.dy) q.steering=nil
   elseif mode=="spread" then
     -- Averaging independent draws gives a smooth, symmetric bell shape with
     -- hard cone bounds. No clamping that could pile shots up at the edges.
@@ -93,19 +140,21 @@ function R:barrel(ctx,n,p,path)
   elseif mode=="bounce" then
     if q.nx then
       local d=q.dx*q.nx+q.dy*q.ny q.dx,q.dy=q.dx-2*d*q.nx,q.dy-2*d*q.ny
-    else q.dx,q.dy=-q.dx,-q.dy end
-  elseif mode=="refract" then
-    if q.nx then q.dx,q.dy=-q.nx,-q.ny end
-  elseif mode=="seeking" or mode=="weakling" or mode=="bossling" then
-    local best,score
-    for _,e in ipairs(self.host.enemies()) do
-      if not e.dead and self:inTargetRange(n,q,e) then
-        local v=(e.x-q.x)^2+(e.y-q.y)^2
-        if mode=="weakling" then v=e.hp elseif mode=="bossling" then v=-e.hp end
-        if not score or v<score then best,score=e,v end
-      end
+      if q.steering then q.steering={source=q.steering,normal={q.nx,q.ny}} end
+    else
+      q.dx,q.dy=-q.dx,-q.dy
+      if q.steering then q.steering={source=q.steering,offset=math.pi} end
     end
-    if best then q.dx,q.dy=unit(best.x-q.x,best.y-q.y) end
+  elseif mode=="refract" then
+    if q.nx then q.dx,q.dy=-q.nx,-q.ny q.steering=nil end
+  elseif seeks(mode) then
+    local key=path..n.id
+    local state=ctx.aims[key]
+    if not state then state={} ctx.aims[key]=state end
+    q.steering={state=state,node=n,source=p.steering,fallback=angle(p.dx,p.dy)}
+    state.packet=copy(q)
+    local a=self:aimAngle(q.steering,q.x,q.y)
+    q.dx,q.dy=math.cos(a),math.sin(a)
   end
   if mode=="multi" or mode=="alternating" then count=cfg.count end
   local first,last=1,count
@@ -277,7 +326,8 @@ function R:walk(ctx,n,signal,p,path,payloads)
     if cfg.subclass=="delay" and cfg.delayTicks>0 then
       local h=ctx.buffers[key] or {} ctx.buffers[key]=h
       local i=state.tick%cfg.delayTicks+1 local old=h[i]
-      h[i]=copy(p) if old then p=copy(old) p.fixed=true end
+      h[i]=copy(p) h[i].steering=nil -- Delay captures the incoming heading too.
+      if old then p=copy(old) p.fixed=true end
     end
     signal=state:step(signal,observation)
     -- A module can execute in several event contexts/routes in the same tick.
@@ -308,8 +358,10 @@ function R:walk(ctx,n,signal,p,path,payloads)
       end
     end
     local hot={}
-    if signal==1 then
-      for _,b in ipairs(self:barrel(ctx,n,p,path)) do routes[b.port]=b hot[b.port]=true end
+    if signal==1 or seeks(cfg.subclass) then
+      for _,b in ipairs(self:barrel(ctx,n,p,path)) do
+        routes[b.port]=b hot[b.port]=signal==1
+      end
     end
     local function emit()
       for _,b in ipairs(routes) do
@@ -341,6 +393,11 @@ function R:simulate(s)
   local origin=s.packet
   if s.sustained and not origin.fixed then
     local w=self.host.wielder() origin.x,origin.y=w.x,w.y
+  end
+  if s.sustained and origin.steering then
+    s.baseAngle=self:refreshAim(origin)
+    s.dirX,s.dirY=math.cos(s.baseAngle),math.sin(s.baseAngle)
+    s.state.strikeAimX,s.state.strikeAimY=s.dirX,s.dirY
   end
   local distance=self:movement(s)
   s.age=s.age+dt
@@ -424,6 +481,11 @@ function R:step()
   for _,q in ipairs(incoming) do
     if #self.contexts<256 then self:context(q.seq,q.event) else self.stats.limited=self.stats.limited+1 end
   end
+  -- Existing beams keep their own captured origin, even if a fresh delayed
+  -- packet reaches the same route while they are still active.
+  for _,s in ipairs(self.strikes) do
+    if s.alive and s.sustained then self:refreshAim(s.packet) end
+  end
   if self.valid then
     for _,ctx in ipairs(self.contexts) do
       ctx.hotKeys={}
@@ -435,6 +497,9 @@ function R:step()
         end
       end
       ctx.age=ctx.age+1
+      -- Post-Striker aim also advances between pulses; no catch-up snap on
+      -- the next shot, and no firing opportunity is manufactured here.
+      for _,state in pairs(ctx.aims) do self:refreshAim(state.packet) end
     end
   end
   for _,group in ipairs(self.groups) do

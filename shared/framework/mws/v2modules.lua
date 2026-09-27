@@ -46,6 +46,10 @@ define("barrel", "BRL", "Transform incoming direction; order matters.",
     only(int("count", "Directions", 3, 2, 8),"multi","alternating"),
     only(number("spread", "Spread arc", 30, 0, 360, "deg"),"spread","multi","alternating"),
     only(number("rotationSpeed", "Rotation", 90, -720, 720, "deg/s"),"rotating"),
+    only({name="turnSpeed",label="Turn speed",type="number",default=180,
+      min=0,max=1440,unit="deg/s",format="%.0f",
+      help="Aim turns continuously at this speed. 0 means instant aiming."},
+      "seeking","weakling","bossling"),
   }, 8)
 define("striker", "STK", "Creates colliders and emits Hit / Complete; requires energy.",
   {"ranged","piercing","stab","sweep","area","orbit"}, "ranged", {

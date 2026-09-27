@@ -2,7 +2,7 @@
 
 **Status:** design draft; agreed rules plus explicitly identified open decisions.
 
-**Updated:** 21 September 2026.
+**Updated:** 27 September 2026.
 
 **Implementation status:** a playable v2 subset is available in the F8 bench,
 including sequence reservoirs, all Trigger subclasses, strike events and editable
@@ -342,7 +342,17 @@ that behavior explicitly within a graph.
 | Refract | Change direction based on the reverse collision normal; preserve DOI when none is supplied. |
 | Random | Select one of N > 1 inputs randomly and output it at the average DOI. |
 
-The last rule deliberately preserves the stated distinction between choosing an
+Seeking, Weakling and Bossling re-evaluate eligible targets every simulation
+tick. Their configurable **Turn speed** limits angular movement along the
+shortest arc; changing targets starts that turn immediately, without waiting
+for the current strike to complete. Aim continues between firing pulses.
+Sustained strikes track the resulting direction, while launched projectiles
+retain their launch heading. Each execution route keeps its own aiming state;
+split outputs retain their downstream angle offsets. Delay captures the heading
+at its input; a targeting Barrel after Delay can acquire a target at execution.
+The initial tuning is 180 degrees/sec, with zero explicitly selecting instant aim.
+
+The Random rule deliberately preserves the stated distinction between choosing an
 input and averaging its direction; the metadata selected and inputs averaged
 need definition. Other open details include circular/vector averaging, opposing
 directions, input synchronization, targeting criteria/fallbacks, refraction math,
