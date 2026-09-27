@@ -223,6 +223,34 @@ cannot keep up. Modules that cannot work — a chain trigger with no payload
 above it, a terminal module with something wired below — are outlined in the
 warning colour, and the first problem is named in the header.
 
+## Combat feedback and payload colours
+
+Payload identity follows the damage family through the graph, projectile,
+trail, and hit effect. **Sharp / blade is cyan**, **Impact is gold**, and
+**Plasma is violet**. Payload tiles also use blade, burst, and ring icons;
+impacts repeat those shapes, so recognition does not depend only on colour.
+Mixed payloads retain separate bands/rings and alternating trail colours,
+with the first payload as the core. A payload-free strike is neutral grey.
+Legacy direct-damage graphs and ordinary bullets use Sharp.
+
+The shared palette reserves **lime green for Acid / Corrosive**, **orange for
+Fire / Burning**, **blue for Freezing**, and **pink for Black Hole / Void**.
+Those damage subclasses are still unimplemented; reserving a colour does not
+add them to the bench's subclass menu or introduce status effects.
+
+Tune colours under **F1 → Render → Payload colours**. **Combat feedback** on
+that page controls muzzle flashes, trails, impact sparks and kill bursts.
+The colour identity remains when these extra effects are disabled. A payload's
+existing Effect option still controls its additional authored shape.
+
+**F1 → Audio** provides master, firing, hit/kill and beam-hum volume controls,
+a mute toggle and an overlapping-sound limit. Firing and hits use synthesized
+voices per family, kills have a deeper tail, and sustained Plasma has a hum.
+Rapid contacts are coalesced so beams and volleys do not overwhelm the mix.
+Pausing, resetting, switching levels and switching weapons stop stale sounds;
+automated screenshot runs stay silent. Cosmetics use a separate random stream,
+so changing their density or volume cannot change combat or enemy spawns.
+
 ## The shop
 
 The shop lays out as a grid, eight offers by default, mixing weapons and

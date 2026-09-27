@@ -77,7 +77,7 @@ to finish a strike. Edits and Reset test refresh these indicators immediately.
 | Battery | Infinite, with capacity, refill, initial charge and five tiers |
 | Barrel | Forward, Directional, Spread, Multi, Alternating, Blind, Seeking, Weakling, Bossling, Rotating, Bounce, Refract |
 | Striker | Ranged, Piercing, Stab, Sweep, Area, Orbit |
-| Payload | Sharp, Impact, Plasma, with primitive visual effects |
+| Payload | Sharp (cyan), Impact (gold), Plasma (violet), with shared visual/audio identities |
 
 The v2 palette has five classes. Repeater is a Trigger subclass; Emitter is absent.
 All batteries add across their sequence, regardless of placement/branch. Direct
@@ -206,3 +206,23 @@ luajit tools/screenshot.lua /tmp/mws-pulse.png --mode bench --at 4 --seed 7 --se
 luajit tools/screenshot.lua /tmp/mws-beam.png --mode bench --at 0.5 --seed 7 --set bench.prototype=v2_beam --set bench.holdFire=true
 luajit tools/screenshot.lua /tmp/mws-complete.png --mode bench --at 3 --seed 7 --set bench.prototype=v2_complete --set bench.holdFire=true
 ```
+
+## Payload presentation
+
+The host supplies a common payload identity registry for both graph tiles and
+combat. Sharp uses a blade mark, Impact a burst, and Plasma rings. Shots have
+bright cores, muzzle flashes and fading trails; contacts have coloured sparks
+and short white flashes; kills add a larger burst and a deeper sound. Split
+brightness also scales the new visuals and sound intensity. Mixed families
+remain separate colours instead of being averaged. Payload-free strikes remain
+grey and do not generate damaging-hit feedback.
+
+`host.damage(strike, target, damage, payload)` now includes the actual funded
+payload node so mixed-payload hits have the right identity. Existing hosts may
+ignore the extra argument. Presentation never spends energy or changes collision
+geometry. A contact that cannot fund its payload produces no damage feedback.
+
+Burning, Corrosive, Freezing and Black Hole have reserved palette entries only;
+their mechanics and subclass availability are unchanged. Every colour and global
+feedback/audio control is schema-generated. Headless runs require no audio
+backend. Screenshots suppress audio; pause/reset/level changes stop all voices.

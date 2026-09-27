@@ -402,7 +402,7 @@ function R:simulate(s)
             if not self:pay(s.seq,energy) then self:finish(s,"energy") break end
             local damage=energy*q.efficiency
             if q.subclass=="impact" then damage=damage*p.weight*math.max(0.1,p.speed/100) end
-            if damage>0 then self.host.damage(s,e,damage) end
+            if damage>0 then self.host.damage(s,e,damage,payload) end
             if first and q.effect~="none" and self.host.effect then self.host.effect(q.effect,e.x,e.y,payload) end
           end
         end

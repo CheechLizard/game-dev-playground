@@ -17,7 +17,7 @@ local M = {}
 -- player, then what fights the player, then what it all costs.
 local PAGE = {
   Run = 10, Player = 20, Leveling = 30, Weapons = 40, Passives = 45,
-  Enemies = 50, Waves = 60, Economy = 70, Levels = 80, Render = 90,
+  Enemies = 50, Waves = 60, Economy = 70, Levels = 80, Render = 90, Audio = 92,
   Overlays = 95, Debug = 99,
 }
 
@@ -274,8 +274,7 @@ function M.register()
       default = 216, min = 90, max = 1080, live = false },
   })
 
-  -- Three foreground colours on a dark background, as specified. They are
-  -- settings rather than constants so a profile can restyle the whole game.
+  -- Base UI/world palette; payload identities have their own consistent colours.
   register("Render", "Palette", 20, {
     { key = "palette.background", label = "Background", type = "color",
       default = { 0.043, 0.047, 0.078, 1 } },
@@ -285,6 +284,23 @@ function M.register()
       default = { 0.851, 0.259, 0.310, 1 } },
     { key = "palette.accent", label = "Accent / pickups", type = "color",
       default = { 0.361, 0.831, 0.639, 1 } },
+  })
+
+  require("payloads").registerSettings(schema)
+  register("Render", "Combat feedback", 27, {
+    {key="feedback.enabled",label="Combat effects",type="bool",default=true,
+      help="Muzzle flashes, trails and impact particles. Payload colours remain visible."},
+    {key="feedback.trailLife",label="Trail duration",type="number",default=0.12,
+      min=0.02,max=0.4,unit="s",format="%.2f"},
+  })
+  register("Audio", "Combat", 10, {
+    {key="audio.enabled",label="Sound enabled",type="bool",default=true},
+    {key="audio.volume",label="Master volume",type="number",default=0.45,min=0,max=1,format="%.2f"},
+    {key="audio.shots",label="Firing volume",type="number",default=0.65,min=0,max=1,format="%.2f"},
+    {key="audio.hits",label="Hit / kill volume",type="number",default=0.8,min=0,max=1,format="%.2f"},
+    {key="audio.beams",label="Beam hum volume",type="number",default=0.35,min=0,max=1,format="%.2f"},
+    {key="audio.voices",label="Simultaneous sounds",type="int",default=16,min=1,max=32,
+      help="One extra voice is reserved for the sustained plasma hum."},
   })
 
   register("Render", "Feel", 30, {

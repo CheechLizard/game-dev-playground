@@ -235,6 +235,7 @@ local function drawNode(view, rect, g, node, opts)
   local problem = opts.problems and opts.problems[node.id]
   local info = opts.info and opts.info[node.id]
   local live = g.version==2 and info or nil
+  local style = opts.nodeStyle and opts.nodeStyle(node)
 
   setColour(ui.theme.background)
   gfx.rectangle("fill", x, y, size, size)
@@ -254,9 +255,13 @@ local function drawNode(view, rect, g, node, opts)
   setColour(outline)
   gfx.rectangle("line", x + 0.5, y + 0.5, size - 1, size - 1)
 
-  setColour(selected and ui.theme.accent or ui.theme.fg)
-  flowchart.icon(node.type, x + size / 2, y + (size - tagH) / 2,
-    (size - tagH) * 0.32, live)
+  setColour(style and style.colour or (selected and ui.theme.accent or ui.theme.fg))
+  if style and style.icon then
+    style.icon(x+size/2,y+(size-tagH)/2,(size-tagH)*0.32)
+  else
+    flowchart.icon(node.type, x + size / 2, y + (size - tagH) / 2,
+      (size - tagH) * 0.32, live)
+  end
 
   local font = fonts.get("pixel", math.max(8,math.floor(view.zoom*4)))
   gfx.setFont(font)
@@ -264,6 +269,7 @@ local function drawNode(view, rect, g, node, opts)
   gfx.line(x, y + size - tagH + 0.5, x + size, y + size - tagH + 0.5)
   setColour(selected and ui.theme.accent or ui.theme.dim)
   local tag = t.short or t.name:sub(1, 3)
+  if style then setColour(style.colour) end
   if live and node.type=="trigger" then
     tag=live.hot==1 and "HOT" or "COLD"
     setColour(live.hot==1 and ui.theme.accent or ui.theme.fg)
@@ -525,6 +531,8 @@ function flowchart.inspector(view, g, width, opts)
 
   local t = graph.modules(g).byId[node.type]
   ui.heading(t.name)
+  local style=opts.nodeStyle and opts.nodeStyle(node)
+  if style then ui.label(style.label, style.colour) end
   ui.label(t.blurb, ui.theme.dim, ui.lineHeight)
   ui.space(2)
 

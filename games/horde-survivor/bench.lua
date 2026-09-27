@@ -138,6 +138,7 @@ function bench.equip(s, index)
   local r = s.run
   r.player.weapons = {}
   r.strikes, r.effects, r.particles = {}, {}, {}
+  require("feedback").reset(r)
   local weapon = r:addWeapon(def.prototype and "blaster" or def.id)
   if def.prototype then r:buildWeaponGraph(weapon,arsenal.load(def.graph)) end
   s.weapon = weapon
@@ -164,6 +165,7 @@ end
 -- the striker-to-payload wiring, both of which a rewire invalidates.
 local function rearm(s)
   if s.weapon and s.weapon.mws then s.weapon.mws:rebuild() end
+  require("feedback").reset(s.run)
 end
 
 --- The weapon's live numbers, level and player bonuses included, so the
@@ -349,6 +351,7 @@ function bench.drawOverlay(s, scale, ox, oy)
         info = s.weapon.mws and s.weapon.mws.info,
         problems = problemMap(g),
         propOf = propOf(s),
+        nodeStyle = require("payloads").nodeStyle,
       }) then
     rearm(s)
   end
@@ -435,7 +438,7 @@ function bench.drawOverlay(s, scale, ox, oy)
   gfx.line(canvasW + 1, listY - ui.rowGap / 2 + 0.5, ww, listY - ui.rowGap / 2 + 0.5)
   local innerW = ui.beginScroll("bench.inspector", canvasW + 1, listY,
     inspectW - 1, listH)
-  if flowchart.inspector(s.view, g, innerW, { showHelp = s.showHelp }) then rearm(s) end
+  if flowchart.inspector(s.view, g, innerW, { showHelp = s.showHelp, nodeStyle = require("payloads").nodeStyle }) then rearm(s) end
   ui.endScroll("bench.inspector", canvasW + 1, listY, inspectW - 1, listH)
 
   -- The launcher draws dropdowns after all panels.

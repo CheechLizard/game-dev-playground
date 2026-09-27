@@ -168,3 +168,13 @@ and Chain trigger below must not be used as definitions for the revised design.
 | **Integration branch** | `main`. The stable base every worktree branches from and every change merges back into. | — |
 | **Worktree** | An additional checkout for parallel work, created as a *sibling* of the repo — never inside it, since `love .` treats the whole directory tree as the game source. | `tools/worktree.sh` |
 | **Save identity** | The LÖVE save-directory name. Derived from the checkout's directory name rather than fixed, so parallel worktrees do not share one screenshot folder and overwrite each other's captures. Captures normally land in the checkout instead; this is the fallback when that write fails. | `conf.lua`, `t.identity`, `fs.write` |
+
+## Combat presentation
+
+| Term | Meaning | Code |
+|---|---|---|
+| **Payload identity** | The shared colour, impact mark and sound family for a damage subclass. Sharp/blade is cyan, Impact gold, Plasma violet. Acid/lime, Fire/orange, Ice/blue and Void/pink are reserved for future subclasses. | `games/horde-survivor/payloads.lua` |
+| **Mixed payload** | A strike with multiple payload families. Its first family colours the core; other families keep separate bands/rings and alternating trail colours. Actual damage contacts use the funded payload's identity. | `payloads.strike`, `feedbackdraw.lua` |
+| **Combat feedback** | Bounded muzzle flashes, fading trails, directional hit particles and larger kill cues. Presentation data does not change damage, collision geometry or weapon energy. | `feedback.lua`, `feedbackdraw.lua` |
+| **Feedback random stream** | A cosmetic-only generator separate from both gameplay randomness and the older weapon-jitter stream. Sound variation and new impact particles cannot alter the simulation. | `run.feedbackRng` |
+| **Sound voice** | One simultaneous synthesized sound. Repeated events are coalesced, one-shots are capped, and one extra voice is reserved for sustained Plasma hum. | `sound.lua` |

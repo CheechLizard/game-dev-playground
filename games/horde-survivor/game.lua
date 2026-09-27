@@ -18,6 +18,7 @@ local render = require("render")
 local hud = require("hud")
 local sandbox = require("sandbox")
 local bench = require("bench")
+local sound = require("sound")
 
 local game = {}
 
@@ -34,6 +35,7 @@ local benchState = nil
 
 --- Enter a level outright. `next` is "run", "zoo", "range" or "bench".
 local function enterMode(next)
+  sound.stop()
   ui.cancelInteractions()
   mode = next
   render.underlay = nil
@@ -253,6 +255,7 @@ end
 --- Start a fresh run. A seed makes the run reproducible, which is what the
 -- screenshot path passes so the same command line captures the same frame.
 function game.restart(seed)
+  sound.stop()
   current = runModule.new(seed or
     (os.time() + math.floor(love.timer.getTime() * 1000)))
   current.summaryCache = nil
@@ -289,7 +292,7 @@ local function handleShopInput(r)
   end
 end
 
-function game.update(dt)
+local function updateSimulation(dt)
   if not current then return end
   local c = config.values
 
@@ -387,6 +390,15 @@ function game.update(dt)
   perf.count("projectiles", #current.projectiles)
   perf.count("enemy shots", #current.enemyShots)
   perf.count("pickups", #current.pickups)
+end
+
+-- Audio follows the active world and never runs during capture fast-forward.
+function game.update(dt)
+  updateSimulation(dt)
+  local r=benchState and benchState.run or sandboxState and sandboxState.run or current
+  local active=r and r.state==runModule.STATE.PLAYING and not game.isPaused()
+    and config.values.debug.timeScale>0 and not require("framework.capture").active()
+  sound.update(r,dt,active)
 end
 
 -- -------------------------------------------------------------------- draw

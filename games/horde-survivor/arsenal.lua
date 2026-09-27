@@ -244,7 +244,11 @@ function arsenal.instance(r, weapon, g)
     local host=arsenal.host(r,weapon)
     host.enemies=function() return r.enemies end
     host.random=function() return r.rng.next() end
-    host.damage=function(_,target,damage) r:damageEnemy(target,damage,weapon.id,0,0,0) end
+    host.damage=function(strike,target,damage,payload)
+      if target.dead then return end
+      local crit=r:damageEnemy(target,damage,weapon.id,0,0,0)
+      require("feedback").hit(r,strike,target,require("payloads").node(payload),crit)
+    end
     return mws.v2runtime.new(g,host)
   end
   return mws.runtime.new(g, arsenal.host(r, weapon), {

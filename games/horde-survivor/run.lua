@@ -8,6 +8,8 @@
 local config = require("framework.config")
 local content = require("content")
 local arsenal = require("arsenal")
+local feedback = require("feedback")
+local payloads = require("payloads")
 
 local run = {}
 run.__index = run
@@ -76,6 +78,7 @@ function run.new(seed)
   -- seed stop being comparable the moment a weapon changes -- which is
   -- exactly when you most want to compare them.
   self.fxRng = makeRng((seed or os.time()) * 7919 + 13)
+  self.feedbackRng = makeRng((seed or 1) * 104729 + 37)
   self.seed = seed
   self:reset()
   return self
@@ -130,6 +133,7 @@ function run:reset()
   self.strikes = {}
   self.effects = {}
   self.particles = {}
+  feedback.reset(self)
   self.enemyShots = {}
   self.pickups = {}
 
@@ -1012,6 +1016,11 @@ function run:fireWeapon(weapon, dt)
         weaponId = id,
         hitSet = {},
       }
+      local pr=self.projectiles[#self.projectiles]
+      pr.dirX,pr.dirY=math.cos(a),math.sin(a)
+      pr.payloadIds={"sharp"}
+      pr.state={collisionSize=pr.radius,brightness=1}
+      feedback.launch(self,pr)
     end
     return true
 
@@ -1119,7 +1128,8 @@ function run:updateProjectiles(dt)
         if dx * dx + dy * dy < reach * reach then
           pr.hitSet[e] = true
           local kx, ky = normalise(pr.vx, pr.vy)
-          self:damageEnemy(e, pr.damage, pr.weaponId, kx * pr.knockback, ky * pr.knockback)
+          local crit=self:damageEnemy(e, pr.damage, pr.weaponId, kx * pr.knockback, ky * pr.knockback)
+          if pr.damage>0 then feedback.hit(self,pr,e,"sharp",crit) end
           if pr.pierce <= 0 then spent = true break end
           pr.pierce = pr.pierce - 1
         end
@@ -1163,6 +1173,7 @@ function run:addStrike(strike, weapon)
   strike.dist = 0
   strike.fallV = 0
   self.strikes[#self.strikes + 1] = strike
+  feedback.launch(self, strike)
 end
 
 local TWO_PI = math.pi * 2
@@ -1235,8 +1246,9 @@ function run:strikeHit(s, e)
   local st = s.state
   local knockback = st.extra.knockback or 0
   local hx, hy = e.x, e.y
-  self:damageEnemy(e, st.baseDamage, s.weaponId,
+  local crit=self:damageEnemy(e, st.baseDamage, s.weaponId,
     s.dirX * knockback, s.dirY * knockback, st.extra.critChance)
+  if st.baseDamage>0 then feedback.hit(self,s,e,nil,crit) end
 
   local survives = (st.triggerBehavior == "retriggerable") or s.pierce > 0
   if s.pierce > 0 and st.triggerBehavior ~= "retriggerable" then
@@ -1258,7 +1270,8 @@ function run:applyPayload(weapon, node, event, wasHit)
     if not e.dead and e ~= event.target then
       local dx, dy = e.x - event.x, e.y - event.y
       if dx * dx + dy * dy < r2 then
-        self:damageEnemy(e, power, weapon.id, 0, 0, crit)
+        local critical=self:damageEnemy(e, power, weapon.id, 0, 0, crit)
+        if power>0 then feedback.hit(self,{dirX=0,dirY=-1},e,payloads.node(node),critical) end
       end
     end
   end
@@ -1275,6 +1288,7 @@ function run:addEffect(name, x, y, node)
   if node and node.props then radius = math.max(6, node.props.damageRadius or 6) end
   self.effects[#self.effects + 1] = {
     name = name, x = x, y = y, age = 0, life = 0.3, radius = radius,
+    payloadId = payloads.node(node),
   }
 end
 
@@ -1401,6 +1415,7 @@ function run:update(dt, moveX, moveY)
   self:updateProjectiles(dt)
   self:updateStrikes(dt)
   self:updateEffects(dt)
+  feedback.update(self,dt)
   self:updateEnemyShots(dt)
   self:updatePickups(dt)
 

@@ -1,11 +1,13 @@
 -- World rendering: camera, sprites and the debug overlays.
 --
 -- Sprites are drawn from primitives rather than image files so the whole game
--- runs with no assets. Everything uses one of three foreground colours on the
--- dark background, per the art direction.
+-- runs with no image assets. Payload colours identify damage families against
+-- the shared dark background.
 
 local config = require("framework.config")
 local dd = require("framework.debugdraw")
+local feedbackdraw = require("feedbackdraw")
+local payloads = require("payloads")
 
 local render = {}
 
@@ -343,67 +345,28 @@ function render.draw(r)
     dd.circle("colliders", s.x, s.y, s.radius)
   end
 
+  feedbackdraw.trails(r)
+
   -- Player projectiles.
   local playerCol = palette("player")
   g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
   for _, pr in ipairs(r.projectiles) do
-    g.circle("fill", pr.x, pr.y, pr.radius)
+    feedbackdraw.strike(pr)
     dd.circle("colliders", pr.x, pr.y, pr.radius)
   end
 
-  -- MWS strikes. The shape comes from the striker's `visual` property, so a
-  -- module graph looks like what it says it is without anything here holding
-  -- a list of weapons. Drawn from primitives, like all the other art.
+  -- Geometry belongs to the Striker; colour and marks identify its Payloads.
   for _, st in ipairs(r.strikes or {}) do
-    local sz = st.state.collisionSize
-    local kind = st.state.visual
-    local brightness=st.state.brightness or 1
-    local red,green,blue=playerCol[1]*brightness,playerCol[2]*brightness,playerCol[3]*brightness
-    g.setColor(red,green,blue,1)
-    if st.v2 and (st.node.props.subclass=="stab" or st.node.props.subclass=="sweep") then
-      local reach=st.node.props.range
-      g.setLineWidth(math.max(1,sz*2))
-      g.line(st.x,st.y,st.x+st.dirX*reach,st.y+st.dirY*reach)
-      g.setLineWidth(1)
-    elseif st.v2 and st.node.props.subclass=="area" and st.node.props.arc<360 then
-      local half=math.rad(st.node.props.arc)/2
-      g.setColor(red,green,blue,0.3)
-      g.arc("fill","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
-      g.setColor(red,green,blue,0.85)
-      g.arc("line","pie",st.x,st.y,sz,st.baseAngle-half,st.baseAngle+half)
-    elseif kind == "bolt" then
-      local lx, ly = st.dirX * sz * 2.5, st.dirY * sz * 2.5
-      g.setLineWidth(math.max(1, sz * 0.8))
-      g.line(st.x - lx, st.y - ly, st.x + lx, st.y + ly)
-      g.setLineWidth(1)
-    elseif kind == "blade" then
-      local px, py = -st.dirY * sz, st.dirX * sz
-      g.polygon("fill", st.x + st.dirX * sz * 2, st.y + st.dirY * sz * 2,
-        st.x + px, st.y + py, st.x - px, st.y - py)
-    elseif kind == "orb" then
-      g.circle("line", st.x, st.y, sz + 1)
-      g.circle("fill", st.x, st.y, sz * 0.45)
-    elseif kind == "field" then
-      g.setColor(red,green,blue, 0.30)
-      g.circle("fill", st.x, st.y, sz)
-      g.setColor(red,green,blue, 0.85)
-      g.circle("line", st.x, st.y, sz)
-    elseif kind == "spark" then
-      g.rectangle("fill", st.x - sz, st.y - 0.5, sz * 2, 1)
-      g.rectangle("fill", st.x - 0.5, st.y - sz, 1, sz * 2)
-    else
-      g.circle("fill", st.x, st.y, sz)
-    end
-    dd.circle("colliders", st.x, st.y, sz)
+    feedbackdraw.strike(st)
+    dd.circle("colliders", st.x, st.y, st.state.collisionSize)
   end
 
   -- Payload effects: a shape that grows and fades over its short life. One
-  -- routine, switched on the effect name, rather than an effect system --
-  -- there is nothing here a particle engine would earn its keep on.
+  -- routine, switched on the authored effect name and tinted by its payload.
   for _, fx in ipairs(r.effects or {}) do
     local t = fx.age / fx.life
     local fade = 1 - t
-    local accentCol = palette("accent")
+    local accentCol = payloads.colour(fx.payloadId)
     g.setColor(accentCol[1], accentCol[2], accentCol[3], fade)
     if fx.name == "burst" then
       g.circle("line", fx.x, fx.y, 2 + t * fx.radius)
@@ -435,6 +398,8 @@ function render.draw(r)
     g.rectangle("fill", pt.x - 0.5, pt.y - 0.5, 1, 1)
   end
   g.setColor(playerCol[1], playerCol[2], playerCol[3], 1)
+
+  feedbackdraw.effects(r)
 
   -- Orbit blades and aura rings.
   for _, w in ipairs(r.player.weapons) do

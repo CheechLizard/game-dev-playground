@@ -347,6 +347,11 @@ if not simOk then
   check("simulation suite loaded", false, simErr)
 end
 
+local feedbackOk, feedbackErr=pcall(function()
+  require("tools.feedbacksuite").run(suite,check,eq,near)
+end)
+if not feedbackOk then suite("combat feedback") check("feedback suite completed",false,feedbackErr) end
+
 -- ------------------------------------------------------------------ done
 
 io.write(string.format("\n%d passed, %d failed\n", passed, failed))
