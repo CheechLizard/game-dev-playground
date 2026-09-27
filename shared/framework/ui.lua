@@ -461,8 +461,11 @@ end
 
 --- Horizontal slider with an inline numeric readout. Dragging is relative to
 -- where the drag started, so the handle does not jump on grab.
+-- A logarithmic scale gives small positive values more space on the track.
 function ui.slider(id, label, value, min, max, opts)
   opts = opts or {}
+  local logarithmic=opts.scale=="log" and min>0 and max>min
+  local span=logarithmic and math.log(max/min) or (max-min)
   local x, y, w = nextRow(opts.height or (ui.unit * 7))
   local labelH = ui.lineHeight
   local trackY = y + labelH
@@ -490,25 +493,29 @@ function ui.slider(id, label, value, min, max, opts)
   end
 
   if active == id and mouse.down and inputBlocks == 0 and not pointerBlocked then
-    local span = max - min
     local perPixel = span / math.max(1, w)
     -- Hold shift for fine control.
     if love.keyboard and (love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")) then
       perPixel = perPixel * 0.15
     end
-    local proposed = dragStart.value + (mouse.x - dragStart.x) * perPixel
+    local delta=(mouse.x-dragStart.x)*perPixel
+    local proposed=logarithmic
+      and math.max(min,math.min(max,dragStart.value))*math.exp(delta)
+      or dragStart.value+delta
     proposed = math.max(min, math.min(max, proposed))
     if opts.integer then proposed = math.floor(proposed + 0.5) end
     if opts.step and opts.step > 0 and not opts.integer then
       proposed = math.floor(proposed / opts.step + 0.5) * opts.step
     end
+    proposed=math.max(min,math.min(max,proposed))
     if proposed ~= value then
       value = proposed
       changed = true
     end
   end
 
-  local t = (max > min) and ((value - min) / (max - min)) or 0
+  local t=logarithmic and math.log(math.max(min,math.min(max,value))/min)/span
+    or ((max>min) and ((value-min)/(max-min)) or 0)
   -- Outline for the span, solid accent for the filled part, and a full-height
   -- tick for the handle. The empty part stays empty.
   rect("fill", x, trackY, w * t, trackH, ui.theme.accent)

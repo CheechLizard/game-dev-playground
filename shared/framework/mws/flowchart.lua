@@ -509,7 +509,7 @@ local function drawProp(node, prop, idPrefix)
       { integer = true, unit = prop.unit })
   end
   return ui.slider(id, label, value, prop.min, prop.max,
-    { unit = prop.unit, format = prop.format })
+    { unit = prop.unit, format = prop.format, scale = prop.scale, step = prop.step })
 end
 
 --- @param opts { showHelp }

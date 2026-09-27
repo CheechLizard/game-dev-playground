@@ -25,6 +25,9 @@ moving enemies. The survival game is unaffected.
 - Click a module to change its subclass, tier or settings. Timing values use
   integer simulation ticks: **60 ticks = one second**. Enter or clicking outside
   a timing field commits its value.
+- Collider radius runs from **0.5 to 20 px**. Its slider gives smaller radii
+  more space, with 0.01 px drag steps and two decimal places. Hold Shift for
+  finer dragging, or click the numeric value to enter an exact radius.
 - Drag output ports to inputs to connect modules; drag connected ports to
   disconnect. Add modules using the palette. Delete removes the selection.
 - **Save** writes the graph to `config/weapons/<id>.json`. **Revert** removes
