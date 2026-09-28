@@ -61,6 +61,8 @@ tile hot. A one-tick pulse lasts 1/60 second; the display does not extend it.
 Battery icons fill from the bottom with their sequence's stored energy divided
 by its total capacity. Batteries sharing a sequence display the same pool.
 A short tick beside the cell marks the startup energy, including size and weight.
+For Stab/Sweep this is a start threshold: the charge stays in the reservoir and
+drains during the strike. Other Strikers pay their startup cost upfront.
 Before-Striker Multi marks the combined full-volley cost; after-Striker Multi
 marks one original startup. Different costs get separate ticks. For intermediate
 gates or differently priced Alternating routes, the mark shows the largest
@@ -104,6 +106,13 @@ it keeps its age, hit count and funded strike. Sustained strikes follow this aim
 including downstream split offsets. Projectiles keep their launch direction.
 Delay captures upstream direction; put Seeking after Delay to aim on execution.
 
+Stab and Sweep grow from the origin to full reach over **Extend time** (default
+0.08 seconds). Their visible length and collision reach grow together. The
+**Start threshold** is minimum charge to ignite, including the existing size and
+weight contribution; it is not deducted upfront. An active beam keeps draining
+below the threshold, consuming its final fraction of energy before ending at
+zero. Release and maximum duration still apply. Every restart grows afresh.
+
 ## Explicit prototype choices and departures
 
 These make unsettled parts testable; they do not amend the design specification.
@@ -122,19 +131,25 @@ These make unsettled parts testable; they do not amend the design specification.
    Effective width is capped at period minus one. These are provisional values.
 3. **Energy scheduling:** refill happens first, starts follow stable graph/port
    order, then continuing costs follow creation order. Before-Striker Multi
-   reserves all requested startup costs together, including nested volleys;
-   insufficient energy skips the whole request. Split siblings reserve their
-   combined movement draw before any child moves. Unaffordable movement ends
-   the whole split; an unaffordable Payload ends that child. Branches still share
+   checks all requested start requirements together, including nested volleys;
+   insufficient energy skips the whole request. Only non-beam upfront costs
+   are deducted at ignition. Split siblings fund their combined movement draw
+   before any child moves. Beams use proportional final movement/payload work
+   and end their whole split when the reservoir reaches zero. Other Strikers
+   end the split on unaffordable movement or an individual child on an
+   unaffordable Payload. Branches still share
    one balance with no fairness scheduler for Payload spending.
-4. **Costs:** startup is `startupCost + sizeCost × radius² × weight`. Continuing
+4. **Costs:** the start requirement is `startupCost + sizeCost × radius² × weight`.
+   This is a threshold for Stab/Sweep and an upfront payment for other Strikers. Continuing
    work costs `draw × dt + distanceCost × distance × weight`. Projectiles use
-   actual travel; Orbit uses arc distance; Stab/Sweep use reach × dt. Sharp spends
-   configured energy once per distinct target. Impact also scales damage by
+   actual travel; Orbit uses arc distance; Stab/Sweep use configured reach × dt.
+   Sharp requests configured energy once per distinct target. A beam can spend
+   its last remaining fraction on a Payload, with proportionally reduced damage.
+   Impact also scales damage by
    weight × max(0.1, speed / 100). Plasma spends configured energy/second **per
    overlapping target per tick**. Funded energy becomes damage through efficiency.
    The remaining reservoir is not automatically emptied on every hit.
-   Post-Striker Multi pays startup once and gives each lane `incomingShare / N`.
+   Post-Striker Multi applies the start requirement once and gives each lane `incomingShare / N`.
    Multiply continuing work and Payload energy by that share; damage follows
    funded energy, including Impact's existing weight/speed factor. There is no
    second reservoir or prepayment for unknown future contacts. Geometry, speed,
@@ -166,7 +181,8 @@ These make unsettled parts testable; they do not amend the design specification.
    directly to the Striker.
 8. **Geometry:** Proximity uses an explicit sensor radius, independent of upstream
    gating. Enemies are circles; projectiles sweep their traveled segment, Stab/
-   Sweep use thick lines, Area uses a circular sector, Orbit a moving circle.
+   Sweep use thick lines growing to full reach over Extend time, Area uses a
+   circular sector, Orbit a moving circle.
    Sustained contact normals are approximate; projectile contacts follow travel
    order. Size/shape belongs to the Striker; a Payload shape editor is deferred.
    Seeking/Weakling/Bossling filter by reach before ranking targets. A Barrel

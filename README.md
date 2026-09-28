@@ -148,6 +148,11 @@ their subclass and settings; Save preserves each prototype separately. See the
 [test guide and limitations](docs/MWS_Implementation.md) before comparing the
 prototype with the full design spec.
 
+Stab/Sweep beams grow from the origin over **Extend time** (default 0.08 seconds).
+Their **Start threshold** is minimum charge to begin; it stays in the battery
+and drains as the beam runs. An active beam continues below that threshold until
+depletion, release or its duration limit.
+
 The description below applies to the **legacy survival-game weapons**, which
 remain available after the eight prototypes in the bench.
 

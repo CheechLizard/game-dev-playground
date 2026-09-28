@@ -222,7 +222,7 @@ amount of **stored energy**. Capacity is not the current energy balance.
 | Capacity | C | energy | Maximum storage. |
 | Fill rate | R | energy/second | Rate at which energy is replenished while the battery is supplying/replenishing under its subclass rules. |
 | Stored energy | E | energy | Energy currently available to spend; between 0 and C. |
-| Startup cost | S | energy | Amount required to start a particular strike. |
+| Start requirement | S | energy | Minimum stored charge to begin; a threshold for Stab/Sweep, an upfront cost for other implemented Strikers. |
 | Ongoing draw | D | energy/second | Continuing expenditure, when applicable. |
 
 Multiple batteries contribute additively to the sequence rail. For batteries
@@ -245,9 +245,12 @@ for in a shared rail remain open.
 
 1. If S > C, that strike cannot start with the current battery configuration.
 2. If S <= C but E < S, skip the firing opportunity.
-3. If the trigger is hot and E >= S, pay startup energy and begin the strike.
+3. If the trigger is hot and E >= S, begin the strike. Stab/Sweep retain that
+   charge for ongoing work; other implemented Strikers deduct S upfront.
 4. An active strike spends energy as required for movement and payload work.
-5. If it cannot pay a required continuing cost, the strike ends prematurely.
+5. A Stab/Sweep consumes the last fraction of stored energy through proportional
+   movement or payload work, then ends at zero. Other Strikers end if they
+   cannot pay a required continuing cost.
 6. Continued refill can enable another, fresh strike while the trigger stays hot.
 
 A skipped start creates no strike and produces no Hit or Complete event. An
@@ -257,13 +260,23 @@ count. It also qualifies for the Miss Trigger if that count is zero.
 Filling to maximum capacity is not required before firing. The threshold is the
 required startup energy. Energy is not made negative to fund a strike.
 
+For **Stab and Sweep beams**, S is an ignition threshold, not a lump-sum fee.
+Once active, falling below S does not stop the beam: it continues until energy
+is depleted, its duration expires, or its configured release rule ends it.
+Only a new strike must reach S again. For example, with S = 5, E = 5 and a
+10 e/sec draw without refill, a beam can run for 0.5 seconds. Starting does not
+instantly consume those five units.
+
 For **Multi → Striker**, the startup threshold is the sum of the requested
-strikes' startup costs. Reserve that total before starting any of them. If the
+strikes' start requirements. Require that total before starting any of them. If the
 total exceeds capacity, the volley cannot start; if stored energy is too low,
 skip the entire opportunity. A hot signal retries when the full threshold is
-available. Nested Multi modules before the Striker combine into one reservation.
+available. Nested Multi modules before the Striker combine into one check.
+Beam thresholds remain stored for continuing draw; upfront costs of other
+Strikers are deducted together after the entire request qualifies.
 
-For **Striker → Multi**, pay startup once for the original strike. The children
+For **Striker → Multi**, apply the start requirement once for the original
+strike: check a beam's threshold, or pay another Striker's startup. The children
 divide its output energy; splitting must not create extra energy or allow each
 child to draw the original strike's full power. This division stays within the
 current sequence and does not transfer energy through events.
@@ -272,6 +285,7 @@ For an isolated strike with constant D > R, the approximate duration supported
 by energy E remaining after startup is `E / (D - R)`. This assumes refill remains
 available and there are no other consumers or discrete costs. If D <= R, energy
 alone does not force exhaustion under those assumptions.
+For a beam there is no upfront deduction, so this E includes its starting charge.
 
 Lifetime expenditure can exceed C through replenishment. It is each required
 expenditure that must be affordable, not a precomputed cost for the entire future
@@ -369,8 +383,8 @@ look dimmer so the reduction is visible.
 The first implementation scales continuing movement draw and Payload energy by
 the child's share. Damage follows the funded Payload energy. It preserves speed,
 range, size, and maximum duration; this is explicit initial tuning, not a final
-physical model for energy versus reach. A three-way split therefore costs one
-startup and does one-third damage per child with otherwise identical Payloads.
+physical model for energy versus reach. A three-way split therefore needs one
+start requirement and does one-third damage per child with otherwise identical Payloads.
 Range and damage should not receive independent automatic division penalties.
 
 ## 7. Strikers: colliders and lifecycle
@@ -386,12 +400,17 @@ sequences without requiring a Payload in the originating sequence.
 | Subclass | Behavior |
 |---|---|
 | Ranged | Move a collider from the origin along DOI until collision or maximum distance; report location, DOI, and collision normal when present. |
-| Stab | Place a collider from the sequence origin oriented along DOI, supporting melee and beams. |
-| Sweep | Sweep the collider across DOI, pivoting at the origin, supporting melee and beams. |
+| Stab | Rapidly extend a collider from the sequence origin along DOI, then maintain its reach, supporting melee and beams. |
+| Sweep | Rapidly extend the collider while sweeping across DOI, pivoting at the origin, supporting melee and beams. |
 | Piercing | Ranged movement with repeated payload discharges; achievable discharge count depends on rail power. A configured piercing limit may cap it. |
 | Area | Cover an arc up to 360 degrees around the origin. |
 | Orbit | Orbit a collider around the origin, starting at DOI. |
 | Drone | Travel along DOI with lateral guidance from external player input or AI. |
+
+Stab/Sweep have an **Extend time**, initially 0.08 seconds. Length grows linearly
+from zero to configured reach over that interval. Rendering and collision use
+the same current length, so distant targets cannot be hit before the tip reaches
+them. Every fresh strike, including a restart after exhaustion, extends again.
 
 Range, duration, subclass limits, and energy exhaustion can end a strike. The
 precise origin-following behavior, collider geometry, trigger-release policy,
@@ -451,8 +470,8 @@ occurs and both Complete and Miss Triggers can react if connected.
 With a continuously hot trigger and ongoing draw above refill:
 
 ```text
-Enough stored energy → pay startup cost → beam begins
-Beam spends energy → reservoir cannot fund continuing work
+Stored energy reaches threshold → beam begins without an upfront deduction
+Beam extends from origin while draining energy → reservoir reaches zero
 Beam ends → Complete with this beam's hit count
 Refill reaches startup threshold while trigger remains hot
 New beam begins with fresh lifetime and hit count
@@ -530,7 +549,7 @@ Other migration work includes:
 | Emitter is a separate terminal module with a fire-and-forget execution path. | Emitter is retired; its use cases are composed from sequences using the normal module and strike lifecycle rules. |
 | Single-parent forest; Barrel is the branching module. | Multi-input/output Barrels and one-input/multiple-output Strikers. |
 | Branch-local segments; energy divided across Barrel branches. | Independent sequence reservoirs; placement-independent additive batteries. |
-| Trigger/Repeater pays a precomputed downstream strike cost. | Startup and ongoing expenditures draw from stored sequence energy. |
+| Trigger/Repeater pays a precomputed downstream strike cost. | The Striker checks its start requirement; beam charge drains during work, other startups are paid upfront. |
 | Downstream contexts treated as already paid for. | Every sequence funds its own work. |
 | Chain activation generally depends on Payload-generated events. | Striker events activate downstream sequences, including payload-free sources. |
 | Hit/Miss/Start/Stop lifecycle and player-specific conditions. | Input bitstream, individual Hit events, final Complete, and Miss as a zero-hit filter. |

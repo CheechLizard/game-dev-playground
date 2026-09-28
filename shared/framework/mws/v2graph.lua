@@ -64,6 +64,11 @@ function G.startup(n)
   local p=n.props
   return p.startupCost+p.sizeCost*p.radius*p.radius*p.weight
 end
+function G.isBeam(n)
+  return n.props.subclass=="stab" or n.props.subclass=="sweep"
+end
+-- Beam startup is an eligibility threshold, not an upfront expenditure.
+function G.startupSpend(n) return G.isBeam(n) and 0 or G.startup(n) end
 
 -- A Barrel uses its preceding Striker, or the first Strikers it feeds.
 -- Never borrow reach from a later event sequence or an unrelated branch.

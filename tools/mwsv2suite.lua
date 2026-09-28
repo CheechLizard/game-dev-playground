@@ -156,7 +156,7 @@ function tests.run(suite,check,eq,near)
         eq(sub.." retargets the same active beam",#h.spawned,1)
         eq(sub.." aiming never completes/restarts the strike",r.stats.completed,0)
         eq(sub.." collisions follow the new beam direction",r.stats.hits,2)
-        near(sub.." turning does not spend another startup",r.sequences[1].energy,99)
+        near(sub.." aiming and beam ignition spend no upfront energy",r.sequences[1].energy,100)
         second.x,second.y=200,0 ticks(r,1,false)
         near(sub.." abandons an out-of-range target and turns toward incoming aim",heading(beam),88.5)
       end
@@ -364,6 +364,90 @@ function tests.run(suite,check,eq,near)
     check("restarts create fresh strike objects",h.spawned[1]~=h.spawned[2])
     eq("first beam completes through energy exhaustion",r.log[1].reason,"energy")
     check("energy never becomes negative",r.sequences[1].energy>=0)
+  end
+  suite("mws v2: beam extension and start thresholds")
+  do
+    for _,mode in ipairs({"stab","sweep"}) do
+      local g,_,b,_,s=fixture("toggle",mode,{battery={capacity=2,fillRate=0},
+        striker={startupCost=2,draw=6,range=60,extendTime=0.1,duration=20}})
+      local r,h=world(g) ticks(r,1,true)
+      eq(mode.." appears when charge exactly reaches its start threshold",#r.strikes,1)
+      near(mode.." spends only its ongoing draw on ignition",r.sequences[1].energy,1.9)
+      near(mode.." starts short instead of appearing at full reach",h.spawned[1].reach,10)
+      near(mode.." battery marker remains the minimum starting charge",r.info[b.id].startupCosts[1],2)
+      ticks(r,5,false)
+      near(mode.." reaches full length in the configured extension time",h.spawned[1].reach,60)
+      ticks(r,13,false)
+      eq(mode.." stays alive below its start threshold",#r.strikes,1)
+      near(mode.." consumes energy steadily until the final tick",r.sequences[1].energy,0.1)
+      ticks(r,1,false)
+      near(mode.." exhausts at zero stored energy",r.sequences[1].energy,0)
+      eq(mode.." completes once at exhaustion",r.stats.completed,1)
+      eq(mode.." records energy as its completion reason",r.log[#r.log].reason,"energy")
+      eq(mode.." cannot relight without reaching the threshold again",r.stats.fired,1)
+    end
+    local g,_,_,_,s=fixture("single","stab",{striker={range=60,extendTime=0.1}})
+    local payload=node(g,"payload","sharp",{energy=1,efficiency=1,effect="none"}) wire(g,s,payload)
+    local r,h=world(g,{target(5),target(45)}) ticks(r,1,true)
+    eq("a growing beam can hit a nearby target",r.stats.hits,1)
+    near("the far target takes no damage before the beam tip arrives",h.targets[2].hp,100)
+    ticks(r,3,false)
+    eq("distant collision waits for actual beam reach",r.stats.hits,1)
+    ticks(r,1,false)
+    eq("the far target is hit when the growing collider reaches it",r.stats.hits,2)
+    near("damage starts only when the visible beam reaches the target",h.targets[2].hp,99)
+
+    g=fixture("toggle","stab",{battery={capacity=0.25,fillRate=0},
+      striker={startupCost=0.25,draw=10,duration=20}})
+    r,h=world(g) ticks(r,1,true) ticks(r,1,false)
+    near("the final fractional movement tick uses the last stored energy",r.sequences[1].energy,0)
+    near("partial funding limits the final beam lifetime",h.spawned[1].age,0.025)
+    eq("fractional exhaustion completes exactly once",r.stats.completed,1)
+
+    g,_,_,_,s=fixture("toggle","stab",{battery={capacity=0.25,fillRate=0},
+      striker={startupCost=0.25,duration=20}})
+    payload=node(g,"payload","plasma",{energy=10,efficiency=2,effect="none"}) wire(g,s,payload)
+    r,h=world(g,{target(1)}) ticks(r,1,true) ticks(r,1,false)
+    near("the last partially affordable Plasma contact empties the battery",r.sequences[1].energy,0)
+    near("partial Plasma damage equals the energy actually spent",h.damageTotal,0.5)
+    eq("payload exhaustion retains the beam's contact count",r.log[#r.log].hitCount,1)
+
+    g=fixture("toggle","stab",{battery={capacity=2,fillRate=6},
+      striker={startupCost=2,draw=6,duration=20}})
+    r,h=world(g) ticks(r,1,true) ticks(r,119,false)
+    eq("refill matching draw sustains the same beam below its threshold",#h.spawned,1)
+    eq("a sustainable beam never completes through a threshold recheck",r.stats.completed,0)
+    near("matching refill and draw keep the charge stable",r.sequences[1].energy,1.9)
+
+    g=fixture("toggle","stab",{battery={capacity=2,fillRate=30},
+      striker={startupCost=2,draw=60,duration=20}})
+    r,h=world(g) ticks(r,1,true) ticks(r,6,false)
+    eq("a hot beam relights only after recovering its start threshold",#h.spawned,2)
+    near("a restarted beam extends from the origin again",h.spawned[2].reach,h.spawned[1].node.props.range/4.8)
+    check("restart creates a fresh beam and hit history",h.spawned[1].group~=h.spawned[2].group)
+
+    for _,after in ipairs({false,true}) do
+      local g,_,b,a,s=fixture("toggle","stab",{battery={capacity=after and 2 or 6,fillRate=0},
+        striker={startupCost=2,draw=6}})
+      M.set(a,"subclass","multi") M.set(a,"count",3)
+      if after then
+        G.disconnect(g,b.id,1) G.disconnect(g,a.id,1) wire(g,b,s) wire(g,s,a)
+      end
+      r,h=world(g) ticks(r,1,true)
+      eq("either Multi ordering starts all beam colliders",#r.strikes,3)
+      near("Multi ordering preserves the correct beam start threshold",r.info[b.id].startupCosts[1],after and 2 or 6)
+      near("Multi ordering preserves full versus shared continuing draw",r.sequences[1].energy,after and 1.9 or 5.7)
+      M.set(b,"capacity",after and 1.9 or 5.9) r=world(g) ticks(r,1,true)
+      eq("an underfunded beam volley or split cannot partially start",r.stats.fired,0)
+    end
+    g,_,_,a,s=fixture("single","stab",{battery={capacity=4,fillRate=0},
+      striker={startupCost=2,draw=6}})
+    M.set(a,"subclass","multi") M.set(a,"count",2)
+    local projectile=node(g,"striker","ranged",{startupCost=2,sizeCost=0,draw=0,distanceCost=0})
+    wire(g,a,projectile,2)
+    r=world(g) ticks(r,1,true)
+    eq("a mixed volley funds both beam and projectile thresholds",r.stats.fired,2)
+    near("a mixed volley deducts projectile startup and beam running cost",r.sequences[1].energy,1.9)
   end
   suite("mws v2: actual strike events")
   do
@@ -589,19 +673,19 @@ function tests.run(suite,check,eq,near)
     g,_,b,a,s=split({battery={capacity=2,fillRate=0}},"toggle","stab")
     payload=node(g,"payload","sharp",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
     r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,10,false)
-    eq("one child's payload exhaustion leaves its siblings active",#r.strikes,2)
-    eq("an ended child does not restart while its parent stays active",#h.spawned,3)
-    eq("a partially active split has not completed",r.stats.completed,0)
+    eq("payload depletion ends every beam sharing the empty split",#r.strikes,0)
+    eq("an empty battery cannot restart any split child",#h.spawned,3)
+    eq("depleting a split emits one completion",r.stats.completed,1)
     r:clear()
     eq("reset silently clears the logical parent too",h.spawned[1].group.alive,false)
-    eq("reset does not manufacture a Complete",r.stats.completed,0)
+    eq("reset does not manufacture another Complete",r.stats.completed,1)
 
     -- Continuous damage also shares the budget on every tick.
     g,_,b,a,s=split(nil,"toggle","stab") M.set(a,"spread",0)
     payload=node(g,"payload","plasma",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
     r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,9,false)
     near("split beams share total damage per second",h.damageTotal,2)
-    near("split beams share total payload draw",r.sequences[1].energy,98)
+    near("split beams share total payload draw without an upfront deduction",r.sequences[1].energy,99)
     eq("same-target contacts from separate children each count once",r.stats.hits,3)
     M.set(s,"releaseEnds",true) ticks(r,1,true)
     eq("release ends all split children with one completion",r.stats.completed,1)

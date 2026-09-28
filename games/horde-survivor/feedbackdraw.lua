@@ -23,7 +23,7 @@ function D.strike(s)
   local juice=config.get("feedback.enabled")~=false
   colour(id,juice and 0.18 or 1,power)
   if mode=="stab" or mode=="sweep" then
-    local reach=s.node.props.range
+    local reach=s.reach or s.node.props.range
     if juice and mode=="sweep" then
       local a=math.atan2(s.dirY,s.dirX)
       for i=3,1,-1 do
