@@ -755,6 +755,61 @@ function tests.run(suite,check,eq,near)
     check("the game host runs exhaustion and restart",w.mws.stats.fired>1)
     eq("the game uses the sequence runtime",w.mws.version,2)
   end
+  suite("mws v2: recorded low-battery Stab regression")
+  do
+    local previousLove=love
+    local ok,err=pcall(function()
+      love={graphics={getDimensions=function() return 1280,720 end}}
+      local bench=require("bench") local config=require("framework.config")
+      for _,fps in ipairs({30,60,144}) do
+        require("tools.simsuite").bootstrap()
+        config.set("bench.prototype","v2_pulse")
+        config.set("bench.population",0) config.set("bench.holdFire",false)
+        require("framework.input").resetFire()
+        local state=bench.new()
+        -- Visible in the 2026-09-27 recording: Inverter / 18 E, 16 E/s /
+        -- Seeking / Stab, 8 E start, 87.2 E/s draw / Sharp. Unshown geometry
+        -- retains Pulse's defaults. Start empty to exercise every ignition.
+        local striker
+        for _,id in ipairs(state.graph.order) do
+          local n=state.graph.nodes[id]
+          if n.type=="trigger" then M.set(n,"subclass","inverter")
+          elseif n.type=="battery" then
+            M.set(n,"capacity",18) M.set(n,"fillRate",16) M.set(n,"initialCharge",0)
+          elseif n.type=="striker" then
+            M.set(n,"subclass","stab") M.set(n,"startupCost",8) M.set(n,"draw",87.2)
+            striker=n
+          end
+        end
+        local rt=state.weapon.mws rt:rebuild()
+        local spawned,visible={},{}
+        local spawn=rt.host.spawn
+        rt.host.spawn=function(s) spawned[#spawned+1]=s spawn(s) end
+        local belowThreshold,short,full=false,false,false
+        for _=1,fps*3 do
+          bench.update(state,1/fps,0,0)
+          -- This is the host list consumed by the renderer, after pruning.
+          -- Counting spawn events alone hid the original same-tick death.
+          for _,s in ipairs(state.run.strikes) do
+            visible[s]=(visible[s] or 0)+1
+            belowThreshold=belowThreshold or rt.sequences[1].energy<V.startup(striker)
+            short=short or (s.reach>0 and s.reach<striker.props.range)
+            full=full or s.reach==striker.props.range
+          end
+        end
+        local allVisible=#spawned>0
+        for _,s in ipairs(spawned) do allVisible=allVisible and (visible[s] or 0)>0 end
+        local label=fps.." FPS recorded setup "
+        check(label.."leaves every beam available to render",allVisible)
+        check(label.."stays visible below the start threshold",belowThreshold)
+        check(label.."visibly grows from short to full reach",short and full)
+        check(label.."restarts after exhaustion while the inverter stays hot",rt.stats.fired>2)
+        eq(label.."completes through energy exhaustion",rt.log[#rt.log].reason,"energy")
+      end
+    end)
+    love=previousLove
+    if not ok then error(err) end
+  end
   suite("mws v2: bench input lifecycle")
   do
     local previousLove=love
