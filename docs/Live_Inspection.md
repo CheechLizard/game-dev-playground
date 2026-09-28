@@ -71,25 +71,26 @@ and `cursor` support pagination without duplicates.
 | Event | Meaning |
 |---|---|
 | `strike_start` | A funded collider was created. This alone does not mean it survived until rendering. |
-| `hit` | A v2 strike registered contact. Payload damage may still be unaffordable. |
+| `hit` | A v2 strike registered contact. Payload damage does not consume additional battery charge. |
 | `damage` | Funded damage reached combat feedback; includes payload, target position and whether it killed the target. |
 | `complete` | The v2 strike group completed, with reason and hit count. `miss: true` means zero hits, making it eligible for a Miss trigger. |
 | `strike_end` | An individual v2 collider ended; reason includes energy, duration, release, or rebuild. |
 | `sound_queued` | A sound was requested. `causeEvent` links to its originating start or damage event. |
 | `sound_played` | The audio adapter started a source. Includes sound type and volume; `queuedEvent` links to its queue entry. It does not prove the physical audio device was audible. |
-| `sound_suppressed` | The request was not played; reason distinguishes exhaustion before playback, target/sound cooldown, voice/queue limits, disabled audio, mute, reset or inactive playback. |
+| `sound_suppressed` | The request was not played; reason distinguishes target/sound cooldown, voice/queue limits, disabled audio, mute, reset or inactive playback. |
 | `sound_stopped` | A sustained hum was stopped; includes its contributor strike IDs and reason. |
 | `weapon_rebuild` / `feedback_reset` | Boundaries caused by re-arming, resetting or switching a weapon. |
 
-In particular, a collider can start, exhaust and complete with zero hits before
-the next rendered frame. Its queued launch sound is suppressed with reason
-`strike_exhausted_before_playback`, before consuming a voice or sound cooldown.
-That history contains `strike_start → sound_queued → complete → strike_end →
-sound_suppressed` with matching strike IDs. The request's cause remains
-`strike_start`; a Miss trigger did not itself request a sound. Immediate contacts
-still retain their launch and funded damage sounds. Startup spending and Complete
-events are unchanged. Full lifecycle tracing is for v2 strikes; legacy attacks
-also expose launch and damage audio.
+The replacement energy model charges projectiles once, so paying for a launch
+cannot leave a projectile unable to move or hit. The old
+`strike_exhausted_before_playback` audio workaround has been removed. A sustained
+strike with a very high drain and tiny starting charge can have a sub-frame
+lifetime; its start, final active time and energy completion remain in the trace.
+The sound's cause is its launch, never a Miss or Complete event directly.
+
+Full lifecycle tracing is for v2 strikes; legacy attacks also expose launch and
+damage audio. Configuration reads return the new `startEnergy`, `drainRate` and
+Payload `damage` properties, including automatically converted saved weapons.
 
 ## Implementation and verification
 
@@ -108,6 +109,6 @@ receive 202. All tools declare read-only annotations.
 
 `luajit tools/test.lua` covers the protocol, local-origin restrictions, split
 network reads/writes, client timeouts, bounded event cursors, unsaved graph
-reads, same-tick beam exhaustion and launch suppression, and the captured
+reads, same-tick beam exhaustion, fully paid projectile lifetimes, and the captured
 low-charge projectile setup at 30, 60 and 144 FPS.
 Use `tools/inspect.py` against a running LÖVE instance to verify the full path.

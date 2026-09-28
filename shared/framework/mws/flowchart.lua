@@ -49,7 +49,7 @@ ICONS.battery = function(g, s, live)
   if live then
     g.setColor(ui.theme.fg)
     local overCapacity=false
-    for _,cost in ipairs(live.startupCosts or {}) do
+    for _,cost in ipairs(live.startRequirements or {}) do
       if cost>live.capacity then overCapacity=true
       else
         local fraction=live.capacity>0 and cost/live.capacity or 0
@@ -293,7 +293,7 @@ local function drawNode(view, rect, g, node, opts)
       text = string.format("%.0f of %.0f", info.cost or 0, info.rail or 0)
     end
     if text then
-      local cost=g.version==2 and (info.startupThreshold or info.cost or 0) or (info.cost or 0)
+      local cost=g.version==2 and (info.startRequirement or info.cost or 0) or (info.cost or 0)
       local short = (g.version==2 and (info.capacity or 0) or (info.rail or 0)) < cost
       setColour(short and ui.theme.warn or ui.theme.dim)
       gfx.print(text, x + (size - font:getWidth(text)) / 2, y + size + 3)

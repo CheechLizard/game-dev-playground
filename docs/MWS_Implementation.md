@@ -44,8 +44,8 @@ moving enemies. The survival game is unaffected.
 | V2 / Complete + Field | Hold fire: each shot's completion starts a separately powered field, whether it hit or missed. Both reservoirs appear in the header. |
 | V2 / Delayed single | Tap, then move: a shot fires 60 ticks later from its captured origin. Release never cancels it. The downstream Seeking barrel selects a target at execution time. |
 | V2 / Sweep | Hold fire for repeated sweeps. Each runs to completion after its input pulse goes cold because Release ends strike is off. |
-| V2 / Full volley | Multi → Striker. Hold fire for three full-power bullets per volley, costing 24 startup energy. When charge is low, the whole volley skips until funded. |
-| V2 / Split strike | Striker → Multi. The same settings produce three dimmer bullets for 8 startup energy, each with one-third payload energy and damage. Compare the battery tick, cadence and brightness with Full volley. |
+| V2 / Full volley | Multi → Striker. Hold fire for three full-power bullets per volley, costing 24 energy. When charge is low, the whole volley skips until funded. |
+| V2 / Split strike | Striker → Multi. The same settings produce three dimmer bullets for 8 energy, each with one-third damage. Compare the battery tick, cadence and brightness with Full volley. |
 
 The header shows stored energy / capacity and refill for each sequence. Fire,
 Hit, End, Miss and Skip counters show logical strikes, child/target contacts,
@@ -60,16 +60,16 @@ tile hot. A one-tick pulse lasts 1/60 second; the display does not extend it.
 
 Battery icons fill from the bottom with their sequence's stored energy divided
 by its total capacity. Batteries sharing a sequence display the same pool.
-A short tick beside the cell marks the startup energy, including size and weight.
-For Stab/Sweep this is a start threshold: the charge stays in the reservoir and
-drains during the strike. Other Strikers pay their startup cost upfront.
-Before-Striker Multi marks the combined full-volley cost; after-Striker Multi
-marks one original startup. Different costs get separate ticks. For intermediate
-gates or differently priced Alternating routes, the mark shows the largest
-configured volley; runtime reserves only the requests actually made that tick.
-An upward chevron means a cost exceeds capacity. Continuing work and payload
-spending drain the fill as they happen. The mark does not promise enough energy
-to finish a strike. Edits and Reset test refresh these indicators immediately.
+A short tick marks the explicit **Shot energy** or **Start charge**. There
+are no size or weight additions. Before-Striker Multi marks the whole volley;
+after-Striker Multi marks one original strike. Different requirements get
+separate ticks. Conditional routes show their largest configured volley. An
+upward chevron means the requirement exceeds capacity.
+
+A projectile payment covers its entire flight and hits, even with an empty
+battery afterward. Stab, Sweep, Area and Orbit retain their starting charge and
+drain the single **Energy per second** setting. Target count and Payloads never
+change battery spending. Edits and Reset test refresh these indicators immediately.
 
 ## Available modules
 
@@ -108,8 +108,7 @@ Delay captures upstream direction; put Seeking after Delay to aim on execution.
 
 Stab and Sweep grow from the origin to full reach over **Extend time** (default
 0.08 seconds). Their visible length and collision reach grow together. The
-**Start threshold** is minimum charge to ignite, including the existing size and
-weight contribution; it is not deducted upfront. An active beam keeps draining
+**Start charge** is the explicit minimum charge to ignite; it is not deducted upfront. An active beam keeps draining
 below the threshold, consuming its final fraction of energy before ending at
 zero. Release and maximum duration still apply. Every restart grows afresh.
 
@@ -129,32 +128,20 @@ These make unsettled parts testable; they do not amend the design specification.
    0.5/1/1.5/2/3 for both capacity and refill. Repeater divides its base period by
    the multiplier, rounds to the nearest tick and clamps to at least two ticks.
    Effective width is capped at period minus one. These are provisional values.
-3. **Energy scheduling:** refill happens first, starts follow stable graph/port
-   order, then continuing costs follow creation order. Before-Striker Multi
-   checks all requested start requirements together, including nested volleys;
-   insufficient energy skips the whole request. Only non-beam upfront costs
-   are deducted at ignition. Split siblings fund their combined movement draw
-   before any child moves. Beams use proportional final movement/payload work
-   and end their whole split when the reservoir reaches zero. Other Strikers
-   end the split on unaffordable movement or an individual child on an
-   unaffordable Payload. Branches still share
-   one balance with no fairness scheduler for Payload spending.
-4. **Costs:** the start requirement is `startupCost + sizeCost × radius² × weight`.
-   This is a threshold for Stab/Sweep and an upfront payment for other Strikers. Continuing
-   work costs `draw × dt + distanceCost × distance × weight`. Projectiles use
-   actual travel; Orbit uses arc distance; Stab/Sweep use configured reach × dt.
-   Sharp requests configured energy once per distinct target. A beam can spend
-   its last remaining fraction on a Payload, with proportionally reduced damage.
-   Impact also scales damage by
-   weight × max(0.1, speed / 100). Plasma spends configured energy/second **per
-   overlapping target per tick**. Funded energy becomes damage through efficiency.
-   The remaining reservoir is not automatically emptied on every hit.
-   Post-Striker Multi applies the start requirement once and gives each lane `incomingShare / N`.
-   Multiply continuing work and Payload energy by that share; damage follows
-   funded energy, including Impact's existing weight/speed factor. There is no
-   second reservoir or prepayment for unknown future contacts. Geometry, speed,
-   range and duration are unchanged in this first tuning pass. RGB brightness
-   uses `sqrt(share)` for readability. Ended children do not redistribute shares.
+3. **Energy scheduling:** refill first, then admit starts in stable graph/port
+   order. Before-Striker Multi admits the entire requested volley or none.
+   Only Ranged/Piercing pay on admission. Sustained strikes combine their drain
+   per sequence and share the final fraction of available time equally. The
+   final duration tick pays only for actual active time. Geometry and collision
+   order do not affect charge.
+4. **Costs and damage:** `startEnergy` is the complete projectile payment or the
+   sustained start threshold. `drainRate` exists only for Stab/Sweep/Area/Orbit.
+   Payload `damage` replaces energy/efficiency: Sharp and Impact apply it once
+   per distinct contact; sustained Plasma applies it per second, while a Plasma
+   projectile applies it per contact. There are no travel/size/weight charges,
+   per-target battery debits or Impact speed/weight multipliers. A downstream
+   Multi divides direct damage and sustained drain by the child's share. Speed,
+   range and geometry stay unchanged; brightness uses `sqrt(share)`.
 5. **Concurrency:** Ranged/Piercing request a logical strike each hot tick.
    Stab/Sweep/Area/Orbit maintain one per execution route, including all children
    of a split. A finished child never restarts while its siblings remain active.
@@ -245,18 +232,28 @@ brightness also scales the new visuals and sound intensity. Mixed families
 remain separate colours instead of being averaged. Payload-free strikes remain
 grey and do not generate damaging-hit feedback.
 
-`host.damage(strike, target, damage, payload)` now includes the actual funded
-payload node so mixed-payload hits have the right identity. Existing hosts may
-ignore the extra argument. Presentation never spends energy or changes collision
-geometry. A contact that cannot fund its payload produces no damage feedback.
-
-If a v2 strike exhausts before queued audio is played and has made no contact,
-its launch sound is suppressed. This prevents an invisible, immediately depleted
-collider from sounding like a successful shot. Immediate contacts retain their
-launch and funded damage sounds. Startup spending and Complete/Miss eligibility
-are unchanged; this is an audio presentation rule only.
+`host.damage(strike, target, damage, payload)` identifies the actual Payload
+for matching presentation. Presentation never spends energy or changes geometry.
+Launch audio follows funded starts; there is no special suppression for exhausted
+projectiles because fully paid projectiles cannot exhaust. Extremely short
+sustained strikes can still complete within one display frame and remain visible
+in the event trace. Miss and Complete do not directly request audio.
 
 Burning, Corrosive, Freezing and Black Hole have reserved palette entries only;
 their mechanics and subclass availability are unchanged. Every colour and global
 feedback/audio control is schema-generated. Headless runs require no audio
 backend. Screenshots suppress audio; pause/reset/level changes stop all voices.
+
+## Replacement of the earlier energy model
+
+The v2 runtime's movement payments, size/weight formulas, per-contact Payload
+payments, beam-specific partial Payload payment, and exhausted-shot sound filter
+were deleted. `v2energy.lua` owns refill, atomic admission and sustained drain.
+The ordinary survival weapons still use their separate legacy runtime.
+
+Saved v2 graphs convert on load: `startupCost` becomes `startEnergy`; `draw`
+becomes `drainRate` for sustained types and is discarded for projectiles;
+Payload damage becomes old `energy × efficiency`. Old travel, size and weight
+cost settings are discarded. New saves contain only the new properties. Loading
+does not rewrite the saved file; Save writes the converted graph. Existing weapon
+balance will change, especially Area/Orbit and Impact; geometry and wiring remain.

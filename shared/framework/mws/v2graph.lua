@@ -1,6 +1,7 @@
 -- v2 authoring graph and sequence compilation. The first test build is a DAG
 -- with one parent per node. Multi-input joins remain explicitly unsupported.
 local M=require("framework.mws.v2modules")
+local Energy=require("framework.mws.v2energy")
 local G={}
 function G.new(id,name)
   return {version=2,id=id or "v2",name=name or id or "V2",nodes={},order={},nextId=1}
@@ -60,15 +61,9 @@ function G.subtree(g,n,out)
   for _, c in ipairs(G.childrenOf(g,n)) do G.subtree(g,c.node,out) end
   return out
 end
-function G.startup(n)
-  local p=n.props
-  return p.startupCost+p.sizeCost*p.radius*p.radius*p.weight
-end
 function G.isBeam(n)
   return n.props.subclass=="stab" or n.props.subclass=="sweep"
 end
--- Beam startup is an eligibility threshold, not an upfront expenditure.
-function G.startupSpend(n) return G.isBeam(n) and 0 or G.startup(n) end
 
 -- A Barrel uses its preceding Striker, or the first Strikers it feeds.
 -- Never borrow reach from a later event sequence or an unrelated branch.
@@ -91,7 +86,7 @@ end
 
 -- Static startup marks describe the largest configured volley. Gates may
 -- suppress lanes and Alternating may choose a cheaper route at runtime.
-local function startupThresholds(g,seq,info)
+local function startRequirements(g,seq,info)
   local plans,demands={},{}
   local function barrelDemand(n,visit)
     local children=G.childrenOf(g,n)
@@ -124,7 +119,7 @@ local function startupThresholds(g,seq,info)
   local function demand(n)
     if demands[n.id] then return demands[n.id] end
     local cost
-    if n.type=="striker" then cost=G.startup(n)*planCount(n)
+    if n.type=="striker" then cost=Energy.required(n)*planCount(n)
     elseif n.type=="barrel" then cost=barrelDemand(n,demand) or 0 end
     if cost==nil then
       cost=0 for _,c in ipairs(G.childrenOf(g,n)) do cost=cost+demand(c.node) end
@@ -139,7 +134,7 @@ local function startupThresholds(g,seq,info)
         if parent.type=="barrel" and parent.props.subclass=="multi" then owner=parent end
         parent=G.parentOf(g,parent.id)
       end
-      local cost=owner and demand(owner) or G.startup(n)
+      local cost=owner and demand(owner) or Energy.required(n)
       thresholds[n.id]=cost
       if not seen[cost] then costs[#costs+1]=cost seen[cost]=true end
     end
@@ -179,17 +174,17 @@ function G.compile(g)
   for _,seq in ipairs(sequences) do
     if seq.batteries==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Battery") end
     if seq.strikers==0 then issue(seq.root.id,"Sequence "..seq.id.." requires a Striker") end
-    local costs,thresholds=startupThresholds(g,seq,info)
+    local costs,thresholds=startRequirements(g,seq,info)
     for _,n in ipairs(seq.nodes) do
       local p=info[n.id] p.rail=seq.rate p.capacity=seq.capacity
       p.stored=seq.initial
       if n.type=="trigger" then p.hot=0 end
-      if n.type=="battery" then p.startupCosts=costs end
+      if n.type=="battery" then p.startRequirements=costs end
       if n.type=="barrel" then p.targetStrikers=targetStrikers(g,n,info) end
-      p.cost=n.type=="striker" and G.startup(n) or 0
-      p.startupThreshold=thresholds[n.id]
-      if (p.startupThreshold or 0)>seq.capacity then
-        issue(n.id,"Startup cost for strike / full volley exceeds sequence capacity","warn")
+      p.cost=n.type=="striker" and Energy.required(n) or 0
+      p.startRequirement=thresholds[n.id]
+      if (p.startRequirement or 0)>seq.capacity then
+        issue(n.id,"Required charge for strike / full volley exceeds sequence capacity","warn")
       end
       if n.type=="trigger" and not require("framework.mws.triggers").byId[n.props.subclass] then
         issue(n.id,"Unknown Trigger subclass")
@@ -233,7 +228,20 @@ function G.fromTable(t)
   for _,raw in ipairs(t.nodes or {}) do
     if M.byId[raw.type] then
       local n=G.addNode(g,raw.type,raw.x,raw.y,raw.id)
-      local props=raw.props or {}
+      -- Convert saved graphs once at the boundary. The runtime has no old
+      -- cost model or compatibility path; retired charges are discarded.
+      local props={} for k,v in pairs(raw.props or {}) do props[k]=v end
+      if raw.type=="striker" then
+        props.startEnergy=props.startEnergy or props.startupCost
+        props.drainRate=props.drainRate or props.draw
+        props.startupCost,props.draw,props.sizeCost,props.distanceCost,props.weight=nil,nil,nil,nil,nil
+        if props.subclass=="ranged" or props.subclass=="piercing" then props.drainRate=nil end
+      elseif raw.type=="payload" then
+        if props.damage==nil and type(props.energy)=="number" then
+          props.damage=props.energy*(type(props.efficiency)=="number" and props.efficiency or 2)
+        end
+        props.energy,props.efficiency=nil,nil
+      end
       M.set(n,"subclass",props.subclass or M.byId[raw.type].subclass.default)
       local known={}
       for _,p in ipairs(M.props(n.type,n.props.subclass)) do

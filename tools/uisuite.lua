@@ -336,7 +336,7 @@ function tests.run(suite,check,eq,near)
       love.graphics.polygon=function(mode,...) polygons[#polygons+1]=mode end
       local function battery(energy,capacity,cost)
         boxes,lines={},{}
-        flow.icon("battery",0,0,10,{stored=energy,capacity=capacity,startupCosts={cost}})
+        flow.icon("battery",0,0,10,{stored=energy,capacity=capacity,startRequirements={cost}})
         for _,box in ipairs(boxes) do
           if box.mode=="fill" and math.abs(box.w-6.8)<0.001 then return box end
         end

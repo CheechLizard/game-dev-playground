@@ -109,12 +109,12 @@ experimental choices. The two vocabularies are separated below.
 | **Spread Barrel** | Samples a direction inside its cone, using a symmetric bell-shaped distribution that favours the centre. Multi/Alternating remain evenly spaced fans. |
 | **Multi Barrel** | Before Striker, requests a whole volley of full-power strikes. After Striker, divides one strike's output across its lanes. |
 | **Volley** | The full set of strike starts requested through an upstream Multi in one opportunity. Require their combined starting charge or skip them all; beam charge remains available for ongoing work. |
-| **Split strike** | One funded strike with several child colliders. Shares divide at each downstream Multi; children draw and deal their share of energy and appear dimmer. Hits accumulate together; Complete occurs once after the last child ends. |
-| **Startup cost** | Upfront energy spent to begin a Ranged, Piercing, Area or Orbit strike. Above capacity it can never start; above current stored energy the firing opportunity is skipped. |
-| **Start threshold** | Minimum charge to begin a Stab/Sweep beam. Includes size and weight contributions. It stays in the reservoir for continuous spending; falling below it does not stop an active beam. |
+| **Split strike** | One funded strike with several child colliders. Shares divide at each downstream Multi; children divide direct damage and sustained drain and appear dimmer. Hits accumulate together; Complete occurs once after the last child ends. |
+| **Shot energy** | One complete payment for a Ranged/Piercing projectile. Travel and every hit require no further battery charge. An unaffordable shot or volley is skipped entirely. |
+| **Start charge** | Minimum charge to begin Stab/Sweep/Area/Orbit. Starting does not deduct it; the active strike drains only its configured energy per second until zero, release or duration. |
 | **Extend time** | Time for a Stab/Sweep beam and its collision shape to grow from the origin to full reach, initially 0.08 seconds. Each fresh strike grows again. |
 | **Battery charge indicator** | Live fill of the sequence's stored energy relative to capacity. Side ticks mark distinct startup requirements: full-volley cost for upstream Multi, one startup for a split strike. Conditional volleys show their largest configured cost. An upward chevron marks a cost above capacity. All batteries on one rail show the same shared pool. |
-| **Exhaustion** | Energy ends an active strike. Beams consume the remaining fraction of charge and end at zero; other Strikers end when a required cost is unaffordable. Subsequent firing creates a fresh strike rather than resuming it. |
+| **Exhaustion** | A sustained strike ends when its sequence reaches zero charge. Shared sustained strikes receive proportional final active time. Paid projectiles never exhaust; a restart is a fresh strike. |
 | **Hit** | An event for a qualifying contact during a strike, with accumulated hit count. Counting rules for sustained AOE remain open. |
 | **Complete** | One final event when an actual strike ends, including through energy exhaustion; carries final hit count. A skipped start has no completion event. |
 | **Miss Trigger** | Activates on Complete only when `hitCount == 0`; not an unhandled-event fallback. |
@@ -179,7 +179,7 @@ and Chain trigger below must not be used as definitions for the revised design.
 | Term | Meaning | Code |
 |---|---|---|
 | **Payload identity** | The shared colour, impact mark and sound family for a damage subclass. Sharp/blade is cyan, Impact gold, Plasma violet. Acid/lime, Fire/orange, Ice/blue and Void/pink are reserved for future subclasses. | `games/horde-survivor/payloads.lua` |
-| **Mixed payload** | A strike with multiple payload families. Its first family colours the core; other families keep separate bands/rings and alternating trail colours. Actual damage contacts use the funded payload's identity. | `payloads.strike`, `feedbackdraw.lua` |
+| **Mixed payload** | A strike with multiple payload families. Its first family colours the core; other families keep separate bands/rings and alternating trail colours. Actual damage contacts use the damage Payload's identity. | `payloads.strike`, `feedbackdraw.lua` |
 | **Combat feedback** | Bounded muzzle flashes, fading trails, directional hit particles and larger kill cues. Presentation data does not change damage, collision geometry or weapon energy. | `feedback.lua`, `feedbackdraw.lua` |
 | **Feedback random stream** | A cosmetic-only generator separate from both gameplay randomness and the older weapon-jitter stream. Sound variation and new impact particles cannot alter the simulation. | `run.feedbackRng` |
-| **Sound voice** | One simultaneous synthesized sound. Repeated events are coalesced, one-shots are capped, and one extra voice is reserved for sustained Plasma hum. A v2 launch that exhausts without contact before playback is suppressed without consuming a voice or cooldown. | `sound.lua` |
+| **Sound voice** | One simultaneous synthesized sound. Repeated events are coalesced, one-shots are capped, and one extra voice is reserved for sustained Plasma hum. | `sound.lua` |

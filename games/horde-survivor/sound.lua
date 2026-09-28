@@ -59,14 +59,6 @@ function A.stop(reason)
   A.cooldowns={}
 end
 local function play(event,c,r)
-  local strike=event.strike
-  -- A startup payment can leave no energy for the first movement tick. The
-  -- queued launch survives that collider, but should not claim a visible shot.
-  -- Keep immediate contacts audible, and leave energy/completion rules alone.
-  if event.cause=="strike_start" and strike and strike.v2
-    and not strike.alive and strike.endReason=="energy" and strike.hitCount==0 then
-    diagnostics.sound(r,event,"suppressed",{reason="strike_exhausted_before_playback"}) return
-  end
   local key=event.kind..":"..event.id
   if (A.cooldowns[key] or 0)>A.clock then
     diagnostics.sound(r,event,"suppressed",{reason="sound_cooldown"}) return

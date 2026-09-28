@@ -165,8 +165,14 @@ their subclass and settings; Save preserves each prototype separately. See the
 [test guide and limitations](docs/MWS_Implementation.md) before comparing the
 prototype with the full design spec.
 
+V2 projectiles pay **Shot energy** once; the battery cannot stop their flight or
+hits afterward. Sustained Stab/Sweep/Area/Orbit use **Start charge** and one
+**Energy per second** rate. Payloads set damage directly. Travel, size, weight,
+and payload energy charges have been removed. Saved graphs convert on load;
+Save writes the new controls without changing the weapon's wiring.
+
 Stab/Sweep beams grow from the origin over **Extend time** (default 0.08 seconds).
-Their **Start threshold** is minimum charge to begin; it stays in the battery
+Their **Start charge** is minimum charge to begin; it stays in the battery
 and drains as the beam runs. An active beam continues below that threshold until
 depletion, release or its duration limit.
 

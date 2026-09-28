@@ -2,7 +2,7 @@
 
 **Status:** design draft; agreed rules plus explicitly identified open decisions.
 
-**Updated:** 27 September 2026.
+**Updated:** 27 September 2026 — energy replacement agreed after live debugging.
 
 **Implementation status:** a playable v2 subset is available in the F8 bench,
 including sequence reservoirs, all Trigger subclasses, strike events and editable
@@ -214,99 +214,72 @@ agreed exhaustion/restart behavior remain to be defined.
 
 ### Reservoir model
 
-A battery is a reservoir with a **capacity**, a **fill rate**, and a current
-amount of **stored energy**. Capacity is not the current energy balance.
-
-| Quantity | Symbol | Units | Meaning |
-|---|---|---|---|
-| Capacity | C | energy | Maximum storage. |
-| Fill rate | R | energy/second | Rate at which energy is replenished while the battery is supplying/replenishing under its subclass rules. |
-| Stored energy | E | energy | Energy currently available to spend; between 0 and C. |
-| Start requirement | S | energy | Minimum stored charge to begin; a threshold for Stab/Sweep, an upfront cost for other implemented Strikers. |
-| Ongoing draw | D | energy/second | Continuing expenditure, when applicable. |
-
-Multiple batteries contribute additively to the sequence rail. For batteries
-currently participating under their subclass rules, total capacity and fill rate
-are sums of their contributions. Branches share the rail; the old automatic
-division of energy at Barrel outputs does not apply.
-
-For an unrestricted replenishing reservoir, the conceptual refill is:
+Every sequence owns one reservoir. Batteries add their tier-adjusted capacity
+and refill rate. They do not send energy through events to another sequence.
 
 ```text
-E_after_refill = min(C, E_before_refill + R × elapsed_time)
+charge = min(capacity, charge + refill_per_second × elapsed_time)
 ```
 
-Successful expenditures subtract from E. Runtime integration must respect costs
-over elapsed time; this equation is not a prescribed per-frame scheduling order.
-Initial charge, exact scheduling, and how individual battery limits are accounted
-for in a shared rail remain open.
+Only Strikers spend battery energy. There are two rules:
 
-### Startup and exhaustion
+| Strike | Controls | Payment |
+|---|---|---|
+| Ranged / Piercing projectile | Shot energy | Pay once when the whole shot or volley can be afforded. That payment covers its entire travel and every hit. |
+| Stab / Sweep / Area / Orbit sustained strike | Start charge; energy per second | Start charge is an eligibility threshold and is not deducted. Drain the configured rate only while the strike is active. |
 
-1. If S > C, that strike cannot start with the current battery configuration.
-2. If S <= C but E < S, skip the firing opportunity.
-3. If the trigger is hot and E >= S, begin the strike. Stab/Sweep retain that
-   charge for ongoing work; other implemented Strikers deduct S upfront.
-4. An active strike spends energy as required for movement and payload work.
-5. A Stab/Sweep consumes the last fraction of stored energy through proportional
-   movement or payload work, then ends at zero. Other Strikers end if they
-   cannot pay a required continuing cost.
-6. Continued refill can enable another, fresh strike while the trigger stays hot.
+There are **no travel, size, weight, or payload energy charges**. Collider size,
+speed, reach, target count and damage do not secretly change either payment.
+Payloads configure damage directly. These rules replace the previous layered
+cost model; they are the agreed simplification, not extra exceptions to it.
 
-A skipped start creates no strike and produces no Hit or Complete event. An
-active strike ended by exhaustion does produce Complete with its accumulated hit
-count. It also qualifies for the Miss Trigger if that count is zero.
+### Starting and ending
 
-Filling to maximum capacity is not required before firing. The threshold is the
-required startup energy. Energy is not made negative to fund a strike.
+A hot trigger can start a strike when the reservoir meets its displayed start
+requirement. If that requirement exceeds capacity, it cannot start. If current
+charge is too low, skip the opportunity without spending anything, creating a
+strike, or emitting Hit/Complete. A held-hot trigger retries after refill; a
+cold trigger does not. An unaffordable pulse is never queued.
 
-For **Stab and Sweep beams**, S is an ignition threshold, not a lump-sum fee.
-Once active, falling below S does not stop the beam: it continues until energy
-is depleted, its duration expires, or its configured release rule ends it.
-Only a new strike must reach S again. For example, with S = 5, E = 5 and a
-10 e/sec draw without refill, a beam can run for 0.5 seconds. Starting does not
-instantly consume those five units.
+A paid projectile is independent of subsequent battery charge. It continues to
+its range, duration, collision or piercing limit, and its Payloads still work
+when the reservoir is empty. It cannot end from battery exhaustion.
 
-For **Multi → Striker**, the startup threshold is the sum of the requested
-strikes' start requirements. Require that total before starting any of them. If the
-total exceeds capacity, the volley cannot start; if stored energy is too low,
-skip the entire opportunity. A hot signal retries when the full threshold is
-available. Nested Multi modules before the Striker combine into one check.
-Beam thresholds remain stored for continuing draw; upfront costs of other
-Strikers are deducted together after the entire request qualifies.
+A sustained strike stays active below its start charge. Its only energy expense
+is `energy_per_second × active_time`. At zero charge it completes; after refill,
+a still-hot trigger can start a new strike with a fresh lifetime and hit count.
+Maximum duration and the configured release rule also end it. A zero drain rate
+explicitly permits a sustained strike that uses no energy after qualifying.
 
-For **Striker → Multi**, apply the start requirement once for the original
-strike: check a beam's threshold, or pay another Striker's startup. The children
-divide its output energy; splitting must not create extra energy or allow each
-child to draw the original strike's full power. This division stays within the
-current sequence and does not transfer energy through events.
+For example, with start charge 5, stored charge 5, drain 10 e/s and no refill,
+a beam runs for 0.5 seconds. With refill R below total active drain D, the
+approximate available duration is `charge / (D - R)`, subject to capacity and
+other shot purchases on the same sequence.
 
-For an isolated strike with constant D > R, the approximate duration supported
-by energy E remaining after startup is `E / (D - R)`. This assumes refill remains
-available and there are no other consumers or discrete costs. If D <= R, energy
-alone does not force exhaustion under those assumptions.
-For a beam there is no upfront deduction, so this E includes its starting charge.
+### Multi ordering
 
-Lifetime expenditure can exceed C through replenishment. It is each required
-expenditure that must be affordable, not a precomputed cost for the entire future
-weapon graph. Several concurrent strikes may exhaust a shared rail even when one
-would be sustainable alone; allocation priority/fairness remains open.
+**Multi → Striker** requests full-power strikes. Check the sum of all their
+start requirements before starting any of them. If affordable, deduct all
+projectile payments together; retain the starting charge of sustained strikes.
+Nested Multi modules participate in the same atomic request.
 
-### What consumes energy
+**Striker → Multi** splits one strike. Check and pay only once. Divide damage
+and visual brightness among the child colliders. A sustained split shares one
+drain rate; its children do not each charge the full rate. Nested splits divide
+the incoming share again. Ended children do not donate their share to others.
 
-Energy pays for moving colliders and causing damage. Cost depends on size,
-weight, and distance:
+### Simulation scheduling
 
-- Larger colliders provide coverage but cost more energy.
-- Heavier projectiles or melee weapons cost more to move and can do more damage.
-- Projectile travel and beam reach consume energy.
-- Payloads can translate energy remaining for their work into damage to HP.
-- Piercing can discharge payloads repeatedly, constrained by rail power.
+Refill first, admit requested shots in stable graph/port order, then advance
+active strikes. All sustained strikes on a sequence combine their requested
+drain. If the remaining charge supports only part of that tick, each receives
+the same fraction of its requested active time, including proportional DPS,
+then completes at exhaustion. The last duration tick only pays for actual
+remaining time. Payloads and collision iteration cannot alter battery charge.
 
-The exact formulas, movement-versus-payload budget, and what happens to an
-unaffordable individual payload operation are open. The same energy must not be
-spent multiple times. The older full-downstream-cost payment by Triggers and
-Repeaters is replaced by this model.
+The battery mark uses the same explicit start requirement as the runtime. It
+marks one paid shot, one sustained start charge, or the combined requirement of
+a full volley. No downstream cost estimate or second energy pool is involved.
 
 ### Battery subclasses and tiers
 
@@ -380,8 +353,8 @@ creates three one-sixth shares while the unsplit sibling keeps its half. A child
 that ends does not donate its share to surviving siblings. Split children should
 look dimmer so the reduction is visible.
 
-The first implementation scales continuing movement draw and Payload energy by
-the child's share. Damage follows the funded Payload energy. It preserves speed,
+Each child applies its share of direct Payload damage and sustained drain.
+The split preserves speed,
 range, size, and maximum duration; this is explicit initial tuning, not a final
 physical model for energy versus reach. A three-way split therefore needs one
 start requirement and does one-third damage per child with otherwise identical Payloads.
@@ -402,7 +375,7 @@ sequences without requiring a Payload in the originating sequence.
 | Ranged | Move a collider from the origin along DOI until collision or maximum distance; report location, DOI, and collision normal when present. |
 | Stab | Rapidly extend a collider from the sequence origin along DOI, then maintain its reach, supporting melee and beams. |
 | Sweep | Rapidly extend the collider while sweeping across DOI, pivoting at the origin, supporting melee and beams. |
-| Piercing | Ranged movement with repeated payload discharges; achievable discharge count depends on rail power. A configured piercing limit may cap it. |
+| Piercing | A fully paid projectile with repeated payload discharges up to its configured piercing limit. Hits require no further battery charge. |
 | Area | Cover an arc up to 360 degrees around the origin. |
 | Orbit | Orbit a collider around the origin, starting at DOI. |
 | Drone | Travel along DOI with lateral guidance from external player input or AI. |
@@ -412,7 +385,8 @@ from zero to configured reach over that interval. Rendering and collision use
 the same current length, so distant targets cannot be hit before the tip reaches
 them. Every fresh strike, including a restart after exhaustion, extends again.
 
-Range, duration, subclass limits, and energy exhaustion can end a strike. The
+Range, duration and subclass limits can end a strike. Battery exhaustion can
+end sustained strikes; it cannot end a paid projectile. The
 precise origin-following behavior, collider geometry, trigger-release policy,
 and control sampling over a strike's lifetime remain subclass design work.
 
@@ -478,9 +452,8 @@ New beam begins with fresh lifetime and hit count
 ```
 
 The restarted beam is not a resumed old strike. A better battery can extend
-bursts, shorten interruptions, or sustain the beam. Similar exhaustion can end a
-projectile before maximum range, a sweep before its full arc, an orbit, field,
-or guided drone before its intended duration.
+bursts, shorten interruptions, or sustain the beam. The same rule applies to
+sweeps, orbits and fields. Paid projectiles finish independently of the battery.
 
 ## 8. Payloads: shape, damage, and effects
 
@@ -490,20 +463,22 @@ by the Striker in sequence order. Without a Payload there is no damage.
 
 | Subclass | Behavior / examples |
 |---|---|
-| Sharp | Lightweight, efficient point damage: knives, bullets, swords. |
-| Impact Force | Point damage based on impact speed and weight: clubs and heavy shells; greater firing cost and damage potential. |
-| Plasma | DPS filling an AOE: beams, force fields, lasers. |
+| Sharp | Configured damage once per distinct target: knives, bullets, swords. |
+| Impact Force | Configured point damage with Impact presentation: clubs and heavy shells. No hidden speed or weight multiplier. |
+| Plasma | Configured DPS per overlapping target on a sustained strike; configured damage per contact on a projectile. |
 | Burning | Damage over time that sticks to a target and can spread. |
 | Corrosive | Damage over time that sticks to a target. |
 | Freezing | Stop movement and cause damage. |
 | Black Hole | An outer AOE pulls targets toward an inner event-horizon AOE where damage is applied. |
 
-Energy-to-HP conversion, effect stacking, status duration, spread behavior, and
-the allocation of energy among multiple Payloads remain to be defined. Persistent
-effects after strike completion need an explicit lifetime/energy policy; they
-must not silently borrow another sequence's rail. Responsibility for final
-collision geometry between a Striker's collider and a Payload's shape also needs
-clarification.
+Payloads never debit a battery. Sharp and Impact apply configured damage per
+qualifying contact; sustained Plasma applies configured damage per second for
+actual funded active time. A downstream Multi scales this damage by the child's
+share. Adding targets or Payloads does not change the Striker's energy expense.
+
+Effect stacking, status duration, spread behavior and persistent effects remain
+future work. Their damage and lifetime policies must remain explicit. Final
+collision geometry between a Striker and a Payload's shape also needs definition.
 
 ## 9. Editor requirements and proposed inspection tools
 
@@ -549,7 +524,7 @@ Other migration work includes:
 | Emitter is a separate terminal module with a fire-and-forget execution path. | Emitter is retired; its use cases are composed from sequences using the normal module and strike lifecycle rules. |
 | Single-parent forest; Barrel is the branching module. | Multi-input/output Barrels and one-input/multiple-output Strikers. |
 | Branch-local segments; energy divided across Barrel branches. | Independent sequence reservoirs; placement-independent additive batteries. |
-| Trigger/Repeater pays a precomputed downstream strike cost. | The Striker checks its start requirement; beam charge drains during work, other startups are paid upfront. |
+| Trigger/Repeater pays a precomputed downstream strike cost. | The Striker checks its start requirement; projectiles pay once and sustained strikes use one drain rate. |
 | Downstream contexts treated as already paid for. | Every sequence funds its own work. |
 | Chain activation generally depends on Payload-generated events. | Striker events activate downstream sequences, including payload-free sources. |
 | Hit/Miss/Start/Stop lifecycle and player-specific conditions. | Input bitstream, individual Hit events, final Complete, and Miss as a zero-hit filter. |

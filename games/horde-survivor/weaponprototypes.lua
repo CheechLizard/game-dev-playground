@@ -24,14 +24,14 @@ end
 add("v2_pulse","V2 / Pulse",function()
   return base("v2_pulse","V2 / Pulse","repeater","ranged",{
     trigger={periodTicks=18,pulseTicks=1},battery={capacity=60,fillRate=35},
-    striker={startupCost=8,draw=0,distanceCost=0.01},
+    striker={startEnergy=8},
   })
 end)
 add("v2_beam","V2 / Beam exhaustion",function()
   return base("v2_beam","V2 / Beam exhaustion","toggle","stab",{
     battery={capacity=40,fillRate=10},
-    striker={startupCost=5,draw=35,distanceCost=0,radius=2,range=180,duration=12,releaseEnds=true},
-    payload="plasma",effect={energy=10,efficiency=3},
+    striker={startEnergy=5,drainRate=35,radius=2,range=180,duration=12,releaseEnds=true},
+    payload="plasma",effect={damage=30},
   })
 end)
 add("v2_piercing","V2 / Piercing + Miss",function()
@@ -40,8 +40,8 @@ add("v2_piercing","V2 / Piercing + Miss",function()
   })
   local t=node(g,"trigger","miss",277,145)
   local b=node(g,"battery","infinite",361,145,{capacity=30,fillRate=10})
-  local field=node(g,"striker","area",445,145,{radius=20,arc=360,duration=1,draw=8,releaseEnds=false})
-  local p=node(g,"payload","plasma",529,145,{energy=8,efficiency=2,effect="ring"})
+  local field=node(g,"striker","area",445,145,{radius=20,arc=360,duration=1,drainRate=8,releaseEnds=false})
+  local p=node(g,"payload","plasma",529,145,{damage=16,effect="ring"})
   wire(g,s,t,2) wire(g,t,b) wire(g,b,field) wire(g,field,p)
   return g
 end)
@@ -51,8 +51,8 @@ add("v2_complete","V2 / Complete + Field",function()
   })
   local t=node(g,"trigger","complete",277,145)
   local b=node(g,"battery","infinite",361,145,{capacity=50,fillRate=15})
-  local field=node(g,"striker","area",445,145,{radius=20,arc=360,duration=1.2,draw=8,releaseEnds=false})
-  local p=node(g,"payload","plasma",529,145,{energy=7,efficiency=3,effect="ring"})
+  local field=node(g,"striker","area",445,145,{radius=20,arc=360,duration=1.2,drainRate=8,releaseEnds=false})
+  local p=node(g,"payload","plasma",529,145,{damage=21,effect="ring"})
   wire(g,s,t,2) wire(g,t,b) wire(g,b,field) wire(g,field,p)
   return g
 end)
@@ -69,8 +69,8 @@ add("v2_delay","V2 / Delayed single",function()
 end)
 add("v2_sweep","V2 / Sweep",function()
   return base("v2_sweep","V2 / Sweep","repeater","sweep",{
-    trigger={periodTicks=90},striker={radius=4,range=95,arc=160,duration=0.8,releaseEnds=false,draw=10},
-    effect={energy=4,efficiency=3},
+    trigger={periodTicks=90},striker={radius=4,range=95,arc=160,duration=0.8,releaseEnds=false,drainRate=10},
+    effect={damage=12},
   })
 end)
 -- Same settings, different order: compare volley charge and bullet brightness.
@@ -78,8 +78,8 @@ local function multiPreset(id,name,split)
   local g,_,b,a,s,p=base(id,name,"repeater","ranged",{
     barrel="multi",trigger={periodTicks=30,pulseTicks=1},
     battery={capacity=36,fillRate=18},
-    striker={startupCost=8,sizeCost=0,draw=2,distanceCost=0.01,speed=130,range=180},
-    effect={energy=6,efficiency=2,effect="none"},
+    striker={startEnergy=8,speed=130,range=180},
+    effect={damage=12,effect="none"},
   })
   M.set(a,"spread",60)
   if split then

@@ -4,6 +4,7 @@ local G=require("framework.mws.v2graph")
 local M=require("framework.mws.v2modules")
 local T=require("framework.mws.triggers")
 local Input=require("framework.mws.input")
+local Energy=require("framework.mws.v2energy")
 local R={} R.__index=R
 local STEP=1/60
 local function copy(t) local o={} for k,v in pairs(t) do o[k]=v end return o end
@@ -56,10 +57,6 @@ function R:rebuild()
     if not seq.parent then self:context(seq) end
   end
   if self.host.rebuilt then self.host.rebuilt(self) end
-end
-function R:pay(seq,amount)
-  if seq.energy+1e-8<amount then return false end
-  seq.energy=math.max(0,seq.energy-amount) return true
 end
 function R:packet(ctx)
   local p
@@ -256,52 +253,42 @@ end
 function R:finishGroup(group,reason)
   for _,s in ipairs(group.children) do self:finish(s,reason) end
 end
--- Pre-Striker Multi checks every start requirement together. Each request
--- may contain split colliders; beam thresholds stay stored for ongoing work.
+-- Multi before a Striker gathers one atomic admission. Splits after a
+-- Striker remain one request and therefore pay once.
 function R:withVolley(ctx,emit)
   if ctx.volley then emit() return end
   ctx.volley={}
   emit()
   local requests=ctx.volley ctx.volley=nil
+  self:startRequests(ctx,requests)
+end
+function R:startRequests(ctx,requests)
   if #requests==0 then return end
-  local threshold,cost,colliders=0,0,0
-  for _,request in ipairs(requests) do
-    threshold=threshold+G.startup(request.node)
-    cost=cost+G.startupSpend(request.node)
-    colliders=colliders+request.plan.colliderCount
-  end
+  local colliders=0
+  for _,request in ipairs(requests) do colliders=colliders+request.plan.colliderCount end
   if #self.strikes+colliders>512 then
     self.stats.limited=self.stats.limited+#requests return
   end
-  if ctx.seq.energy+1e-8<threshold then
+  if not Energy.start(ctx.seq,requests) then
     self.stats.skipped=self.stats.skipped+#requests self.stalled=true return
   end
-  self:pay(ctx.seq,cost)
-  for _,request in ipairs(requests) do self:offer(ctx,request.node,1,request.plan,true) end
+  for _,request in ipairs(requests) do self:spawn(ctx,request.node,request.plan) end
 end
-function R:offer(ctx,n,signal,request,prepaid)
-  local cfg=n.props local key=n.id..":"..request.key
+function R:offer(ctx,n,signal,request)
+  local key=n.id..":"..request.key
   if signal==1 then ctx.hotKeys[key]=true end
-  local sustained=cfg.subclass~="ranged" and cfg.subclass~="piercing"
   local active=ctx.active[key]
-  if active and active.alive and sustained then
-    if signal==0 and cfg.releaseEnds then self:finishGroup(active,"release") end
-    return
-  end
+  if active and active.alive and Energy.continuous(n) then return end
   if signal==0 then return end
-  if ctx.volley then
-    ctx.volley[#ctx.volley+1]={node=n,plan=request} return
-  end
-  if #self.strikes+request.colliderCount>512 then self.stats.limited=self.stats.limited+1 return end
-  if not prepaid then
-    if ctx.seq.energy+1e-8<G.startup(n) then
-      self.stats.skipped=self.stats.skipped+1 self.stalled=true return
-    end
-    self:pay(ctx.seq,G.startupSpend(n))
-  end
+  local item={node=n,plan=request}
+  if ctx.volley then ctx.volley[#ctx.volley+1]=item
+  else self:startRequests(ctx,{item}) end
+end
+function R:spawn(ctx,n,request)
+  local cfg=n.props local sustained=Energy.continuous(n)
   local group={alive=true,node=n,sustained=sustained,children={},hitCount=0,
     remaining=request.colliderCount,seq=ctx.seq}
-  ctx.active[key]=group self.groups[#self.groups+1]=group
+  ctx.active[n.id..":"..request.key]=group self.groups[#self.groups+1]=group
   self.stats.fired=self.stats.fired+1
   for _,plan in ipairs(request.plans) do
     local p=plan.packet
@@ -390,16 +377,6 @@ local function distanceToSegment(ex,ey,x,y,dx,dy,length)
   local t=math.max(0,math.min(length,(ex-x)*dx+(ey-y)*dy))
   return (ex-x-t*dx)^2+(ey-y-t*dy)^2
 end
--- Split outputs share each tick's movement draw. Keep geometry unchanged in
--- this first tuning pass; payload energy/damage carries the reduced power.
-function R:movement(s,dt)
-  dt=dt or STEP
-  local p=s.node.props local mode=p.subclass local distance=0
-  if mode=="ranged" or mode=="piercing" then distance=math.min(p.speed*dt,math.max(0,p.range-s.dist))
-  elseif mode=="orbit" then distance=p.orbitRadius*math.abs(math.rad(p.orbitSpeed))*dt
-  elseif mode=="stab" or mode=="sweep" then distance=p.range*dt end
-  return distance,(p.draw*dt+p.distanceCost*distance*p.weight)*s.share
-end
 function R:simulate(s,dt)
   dt=dt or STEP
   local p=s.node.props local mode=p.subclass
@@ -412,7 +389,7 @@ function R:simulate(s,dt)
     s.dirX,s.dirY=math.cos(s.baseAngle),math.sin(s.baseAngle)
     s.state.strikeAimX,s.state.strikeAimY=s.dirX,s.dirY
   end
-  local distance=self:movement(s,dt)
+  local distance=math.min(p.speed*dt,math.max(0,p.range-s.dist))
   s.age=s.age+dt
   if s.reach then s.reach=p.range*math.min(1,s.age/p.extendTime) end
   local oldX,oldY=s.x,s.y
@@ -467,18 +444,13 @@ function R:simulate(s,dt)
           if projectile and (mode=="ranged" or s.hitCount>=p.hitLimit) then s.x,s.y=cx,cy end
         end
         for _,payload in ipairs(s.payloads) do
-          local q=payload.props local continuous=q.subclass=="plasma"
+          local q=payload.props local continuous=s.sustained and q.subclass=="plasma"
           if s.alive and (first or continuous) then
-            local energy=q.energy*(continuous and dt or 1)*s.share
-            -- A beam uses the last fraction of stored energy for proportional
-            -- payload work; it must not die with an unspendable remainder.
-            if G.isBeam(s.node) then energy=math.min(energy,s.seq.energy) end
-            if not self:pay(s.seq,energy) then self:finish(s,"energy") break end
-            local damage=energy*q.efficiency
-            if q.subclass=="impact" then damage=damage*p.weight*math.max(0.1,p.speed/100) end
+            local damage=q.damage*(continuous and dt or 1)*s.share
             if damage>0 then self.host.damage(s,e,damage,payload) end
-            if energy>0 and first and q.effect~="none" and self.host.effect then self.host.effect(q.effect,e.x,e.y,payload) end
-            if G.isBeam(s.node) and s.seq.energy<=1e-8 then self:finish(s,"energy") end
+            if damage>0 and first and q.effect~="none" and self.host.effect then
+              self.host.effect(q.effect,e.x,e.y,payload)
+            end
           end
         end
         if s.alive and mode=="ranged" then self:finish(s,"hit")
@@ -494,7 +466,7 @@ end
 function R:step()
   self.time=self.time+STEP self.stalled=false
   for _,info in pairs(self.info) do if info.hot~=nil then info.hot=0 end end
-  for _,seq in ipairs(self.sequences) do seq.energy=math.min(seq.capacity,seq.energy+seq.rate*STEP) end
+  for _,seq in ipairs(self.sequences) do Energy.refill(seq,STEP) end
   local incoming=self.pending self.pending={}
   for _,q in ipairs(incoming) do
     if #self.contexts<256 then self:context(q.seq,q.event) else self.stats.limited=self.stats.limited+1 end
@@ -520,25 +492,37 @@ function R:step()
       for _,state in pairs(ctx.aims) do self:refreshAim(state.packet) end
     end
   end
+  -- Projectiles are already fully paid. Sustained groups share one drain
+  -- per sequence, independent of movement, geometry and number of targets.
+  local demand,windows,fractions={},{},{}
+  for _,group in ipairs(self.groups) do
+    if group.alive and group.sustained then
+      local remaining,share=0,0
+      for _,s in ipairs(group.children) do
+        if s.alive then
+          remaining=math.max(remaining,group.node.props.duration-s.age)
+          share=share+s.share
+        end
+      end
+      local dt=math.min(STEP,math.max(0,remaining))
+      windows[group]=dt
+      demand[group.seq]=(demand[group.seq] or 0)+group.node.props.drainRate*share*dt
+    end
+  end
+  for seq,amount in pairs(demand) do fractions[seq]=Energy.drain(seq,amount) end
   for _,group in ipairs(self.groups) do
     if group.alive then
-      local cost=0
-      for _,s in ipairs(group.children) do
-        if s.alive then local _,draw=self:movement(s) cost=cost+draw end
+      local dt=STEP
+      if group.sustained then
+        dt=windows[group]
+        if group.node.props.drainRate>0 then dt=dt*fractions[group.seq] end
       end
-      if G.isBeam(group.node) then
-        -- Once lit, a beam needs no further threshold checks. Spend down to
-        -- zero, including a proportional final movement tick for every lane.
-        local available=group.seq.energy
-        local dt=cost>0 and STEP*math.min(1,available/cost) or STEP
-        self:pay(group.seq,math.min(cost,available))
-        if available>1e-8 then
-          for _,s in ipairs(group.children) do if s.alive then self:simulate(s,dt) end end
-        end
-        if group.seq.energy<=1e-8 then self:finishGroup(group,"energy") end
-      elseif self:pay(group.seq,cost) then
-        for _,s in ipairs(group.children) do if s.alive then self:simulate(s) end end
-      else self:finishGroup(group,"energy") end
+      if dt>0 then
+        for _,s in ipairs(group.children) do if s.alive then self:simulate(s,dt) end end
+      end
+      if group.sustained and group.node.props.drainRate>0 and group.seq.energy<=1e-8 then
+        self:finishGroup(group,"energy")
+      end
     end
   end
   local groups={} for _,group in ipairs(self.groups) do if group.alive then groups[#groups+1]=group end end

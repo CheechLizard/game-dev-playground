@@ -15,8 +15,8 @@ local function fixture(trigger,striker,options)
   local t=node(g,"trigger",trigger or "single",options.trigger)
   local b=node(g,"battery","infinite",options.battery or {capacity=100,fillRate=0})
   local a=node(g,"barrel","forward")
-  local s=node(g,"striker",striker or "ranged",{startupCost=1,sizeCost=0,draw=0,
-    distanceCost=0,speed=60,range=20,radius=1,duration=3,releaseEnds=false})
+  local s=node(g,"striker",striker or "ranged",{startEnergy=1,drainRate=0,
+    speed=60,range=20,radius=1,duration=3,releaseEnds=false})
   for k,v in pairs(options.striker or {}) do M.set(s,k,v) end
   wire(g,t,b) wire(g,b,a) wire(g,a,s)
   return g,t,b,a,s
@@ -39,8 +39,8 @@ local function target(x,y) return {x=x,y=y or 0,radius=0,hp=100} end
 local function downstream(g,parent,sub,capacity)
   local t=node(g,"trigger",sub)
   local b=node(g,"battery","infinite",{capacity=capacity or 10,fillRate=0})
-  local s=node(g,"striker","area",{startupCost=1,sizeCost=0,draw=0,
-    distanceCost=0,radius=1,arc=360,duration=0.05,releaseEnds=false})
+  local s=node(g,"striker","area",{startEnergy=1,drainRate=20,
+    radius=1,arc=360,duration=0.05,releaseEnds=false})
   wire(g,parent,t,2) wire(g,t,b) wire(g,b,s)
   return t,b,s
 end
@@ -257,11 +257,11 @@ function tests.run(suite,check,eq,near)
   suite("mws v2: live module telemetry")
   do
     local g,t,b=fixture("inverter","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},
-      striker={startupCost=5}})
+      striker={startEnergy=5}})
     local r=world(g)
     eq("trigger starts cold before its first tick",r.info[t.id].hot,0)
     near("battery initially shows configured empty charge",r.info[b.id].stored,0)
-    near("battery marks the actual startup cost",r.info[b.id].startupCosts[1],5)
+    near("battery marks the actual startup cost",r.info[b.id].startRequirements[1],5)
     ticks(r,1,false)
     eq("trigger displays output rather than button input",r.info[t.id].hot,1)
     near("refill reaches the battery display",r.info[b.id].stored,1)
@@ -277,7 +277,7 @@ function tests.run(suite,check,eq,near)
   end
   do
     local g,_,b,_,s=fixture("single","ranged",{battery={capacity=10,fillRate=0,initialCharge=0.5},
-      striker={startupCost=3,sizeCost=0.2,radius=2,weight=2}})
+      striker={startEnergy=3,radius=2,}})
     local extra=node(g,"battery","infinite",{capacity=20,tier="rare",initialCharge=0.5})
     wire(g,s,extra)
     local _,childBattery=downstream(g,s,"complete",7)
@@ -285,8 +285,8 @@ function tests.run(suite,check,eq,near)
     near("battery display uses pooled tier-adjusted capacity",r.info[b.id].capacity,40)
     near("battery display uses pooled initial energy",r.info[b.id].stored,20)
     near("all batteries in a sequence show the same pool",r.info[extra.id].stored,20)
-    near("startup mark includes size and weight costs",r.info[b.id].startupCosts[1],4.6)
-    near("downstream battery has its own threshold",r.info[childBattery.id].startupCosts[1],1)
+    near("start mark uses the single explicit charge",r.info[b.id].startRequirements[1],3)
+    near("downstream battery has its own threshold",r.info[childBattery.id].startRequirements[1],1)
     near("downstream battery has its own charge",r.info[childBattery.id].stored,7)
     M.set(extra,"tier","legendary") r:rebuild()
     near("tier edits update the meter capacity immediately",r.info[b.id].capacity,50)
@@ -304,10 +304,10 @@ function tests.run(suite,check,eq,near)
     eq("retired event contexts leave no stale hot display",r.info[t.id].hot,0)
   end
   do
-    local g,_,b,a=fixture("single","ranged",{striker={startupCost=5}})
-    local second=node(g,"striker","ranged",{startupCost=9,sizeCost=0}) wire(g,a,second,2)
-    local same=node(g,"striker","ranged",{startupCost=5,sizeCost=0}) wire(g,a,same,3)
-    local r=world(g) local costs=r.info[b.id].startupCosts
+    local g,_,b,a=fixture("single","ranged",{striker={startEnergy=5}})
+    local second=node(g,"striker","ranged",{startEnergy=9,}) wire(g,a,second,2)
+    local same=node(g,"striker","ranged",{startEnergy=5,}) wire(g,a,same,3)
+    local r=world(g) local costs=r.info[b.id].startRequirements
     eq("equal branch costs share one battery mark",#costs,2)
     near("first mark is the lower branch startup cost",costs[1],5)
     near("second mark preserves a different branch startup cost",costs[2],9)
@@ -326,7 +326,7 @@ function tests.run(suite,check,eq,near)
   end
   suite("mws v2: reservoirs and sequence boundaries")
   do
-    local g,_,b,_,s=fixture("inverter","ranged",{battery={capacity=10,fillRate=0},striker={startupCost=11}})
+    local g,_,b,_,s=fixture("inverter","ranged",{battery={capacity=10,fillRate=0},striker={startEnergy=11}})
     local r=world(g) ticks(r,120,false)
     eq("cost above capacity never fires",r.stats.fired,0)
     eq("skipped starts do not complete",r.stats.completed,0)
@@ -348,17 +348,17 @@ function tests.run(suite,check,eq,near)
     near("battery placement within its sequence does not change capacity",seq[1].capacity,40)
   end
   do
-    local g=fixture("single","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},striker={startupCost=5}})
+    local g=fixture("single","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},striker={startEnergy=5}})
     local r=world(g) ticks(r,1,true) ticks(r,20,false)
     eq("unaffordable pulse is lost after refill",r.stats.fired,0)
     ticks(r,1,true) eq("fresh pulse can spend refilled energy",r.stats.fired,1)
-    local hot=fixture("inverter","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},striker={startupCost=5}})
+    local hot=fixture("inverter","ranged",{battery={capacity=10,fillRate=60,initialCharge=0},striker={startEnergy=5}})
     local continuous=world(hot) ticks(continuous,12,false)
     eq("hot signal retries as soon as startup is affordable",continuous.stats.fired,2)
   end
   do
     local g=fixture("toggle","stab",{battery={capacity=10,fillRate=6},
-      striker={startupCost=2,draw=60,duration=20}})
+      striker={startEnergy=2,drainRate=60,duration=20}})
     local r,h=world(g) ticks(r,1,true) ticks(r,89,false)
     check("beam exhausts and restarts without a fresh input edge",r.stats.fired>1)
     check("restarts create fresh strike objects",h.spawned[1]~=h.spawned[2])
@@ -369,12 +369,12 @@ function tests.run(suite,check,eq,near)
   do
     for _,mode in ipairs({"stab","sweep"}) do
       local g,_,b,_,s=fixture("toggle",mode,{battery={capacity=2,fillRate=0},
-        striker={startupCost=2,draw=6,range=60,extendTime=0.1,duration=20}})
+        striker={startEnergy=2,drainRate=6,range=60,extendTime=0.1,duration=20}})
       local r,h=world(g) ticks(r,1,true)
       eq(mode.." appears when charge exactly reaches its start threshold",#r.strikes,1)
       near(mode.." spends only its ongoing draw on ignition",r.sequences[1].energy,1.9)
       near(mode.." starts short instead of appearing at full reach",h.spawned[1].reach,10)
-      near(mode.." battery marker remains the minimum starting charge",r.info[b.id].startupCosts[1],2)
+      near(mode.." battery marker remains the minimum starting charge",r.info[b.id].startRequirements[1],2)
       ticks(r,5,false)
       near(mode.." reaches full length in the configured extension time",h.spawned[1].reach,60)
       ticks(r,13,false)
@@ -387,7 +387,7 @@ function tests.run(suite,check,eq,near)
       eq(mode.." cannot relight without reaching the threshold again",r.stats.fired,1)
     end
     local g,_,_,_,s=fixture("single","stab",{striker={range=60,extendTime=0.1}})
-    local payload=node(g,"payload","sharp",{energy=1,efficiency=1,effect="none"}) wire(g,s,payload)
+    local payload=node(g,"payload","sharp",{damage=1,effect="none"}) wire(g,s,payload)
     local r,h=world(g,{target(5),target(45)}) ticks(r,1,true)
     eq("a growing beam can hit a nearby target",r.stats.hits,1)
     near("the far target takes no damage before the beam tip arrives",h.targets[2].hp,100)
@@ -398,29 +398,29 @@ function tests.run(suite,check,eq,near)
     near("damage starts only when the visible beam reaches the target",h.targets[2].hp,99)
 
     g=fixture("toggle","stab",{battery={capacity=0.25,fillRate=0},
-      striker={startupCost=0.25,draw=10,duration=20}})
+      striker={startEnergy=0.25,drainRate=10,duration=20}})
     r,h=world(g) ticks(r,1,true) ticks(r,1,false)
     near("the final fractional movement tick uses the last stored energy",r.sequences[1].energy,0)
     near("partial funding limits the final beam lifetime",h.spawned[1].age,0.025)
     eq("fractional exhaustion completes exactly once",r.stats.completed,1)
 
     g,_,_,_,s=fixture("toggle","stab",{battery={capacity=0.25,fillRate=0},
-      striker={startupCost=0.25,duration=20}})
-    payload=node(g,"payload","plasma",{energy=10,efficiency=2,effect="none"}) wire(g,s,payload)
+      striker={startEnergy=0.25,drainRate=10,duration=20}})
+    payload=node(g,"payload","plasma",{damage=20,effect="none"}) wire(g,s,payload)
     r,h=world(g,{target(1)}) ticks(r,1,true) ticks(r,1,false)
-    near("the last partially affordable Plasma contact empties the battery",r.sequences[1].energy,0)
-    near("partial Plasma damage equals the energy actually spent",h.damageTotal,0.5)
-    eq("payload exhaustion retains the beam's contact count",r.log[#r.log].hitCount,1)
+    near("the beam drain consumes the final fraction of charge",r.sequences[1].energy,0)
+    near("Plasma damage scales with the final fraction of active time",h.damageTotal,0.5)
+    eq("beam exhaustion retains its contact count",r.log[#r.log].hitCount,1)
 
     g=fixture("toggle","stab",{battery={capacity=2,fillRate=6},
-      striker={startupCost=2,draw=6,duration=20}})
+      striker={startEnergy=2,drainRate=6,duration=20}})
     r,h=world(g) ticks(r,1,true) ticks(r,119,false)
     eq("refill matching draw sustains the same beam below its threshold",#h.spawned,1)
     eq("a sustainable beam never completes through a threshold recheck",r.stats.completed,0)
     near("matching refill and draw keep the charge stable",r.sequences[1].energy,1.9)
 
     g=fixture("toggle","stab",{battery={capacity=2,fillRate=30},
-      striker={startupCost=2,draw=60,duration=20}})
+      striker={startEnergy=2,drainRate=60,duration=20}})
     r,h=world(g) ticks(r,1,true) ticks(r,6,false)
     eq("a hot beam relights only after recovering its start threshold",#h.spawned,2)
     near("a restarted beam extends from the origin again",h.spawned[2].reach,h.spawned[1].node.props.range/4.8)
@@ -428,22 +428,22 @@ function tests.run(suite,check,eq,near)
 
     for _,after in ipairs({false,true}) do
       local g,_,b,a,s=fixture("toggle","stab",{battery={capacity=after and 2 or 6,fillRate=0},
-        striker={startupCost=2,draw=6}})
+        striker={startEnergy=2,drainRate=6}})
       M.set(a,"subclass","multi") M.set(a,"count",3)
       if after then
         G.disconnect(g,b.id,1) G.disconnect(g,a.id,1) wire(g,b,s) wire(g,s,a)
       end
       r,h=world(g) ticks(r,1,true)
       eq("either Multi ordering starts all beam colliders",#r.strikes,3)
-      near("Multi ordering preserves the correct beam start threshold",r.info[b.id].startupCosts[1],after and 2 or 6)
+      near("Multi ordering preserves the correct beam start threshold",r.info[b.id].startRequirements[1],after and 2 or 6)
       near("Multi ordering preserves full versus shared continuing draw",r.sequences[1].energy,after and 1.9 or 5.7)
       M.set(b,"capacity",after and 1.9 or 5.9) r=world(g) ticks(r,1,true)
       eq("an underfunded beam volley or split cannot partially start",r.stats.fired,0)
     end
     g,_,_,a,s=fixture("single","stab",{battery={capacity=4,fillRate=0},
-      striker={startupCost=2,draw=6}})
+      striker={startEnergy=2,drainRate=6}})
     M.set(a,"subclass","multi") M.set(a,"count",2)
-    local projectile=node(g,"striker","ranged",{startupCost=2,sizeCost=0,draw=0,distanceCost=0})
+    local projectile=node(g,"striker","ranged",{startEnergy=2,drainRate=0,})
     wire(g,a,projectile,2)
     r=world(g) ticks(r,1,true)
     eq("a mixed volley funds both beam and projectile thresholds",r.stats.fired,2)
@@ -481,8 +481,9 @@ function tests.run(suite,check,eq,near)
     local g,_,_,_,s=fixture("single","piercing",{striker={speed=500,hitLimit=5}})
     downstream(g,s,"hit",1)
     local r=world(g,{target(2),target(4)}) ticks(r,1,true) ticks(r,1,false)
-    eq("both contacts in a tick are delivered together next tick",r.stats.skipped,1)
-    eq("event activations share one reservoir instead of copying it",r.stats.fired,2)
+    eq("both contacts in a tick are delivered together next tick",r.stats.fired,3)
+    ticks(r,1,false)
+    eq("both child fields exhaust the shared reservoir alongside their completed parent",r.stats.completed,3)
     near("the downstream rail was spent once",r.sequences[2].energy,0)
   end
   suite("mws v2: signals, routes and spatial context")
@@ -536,7 +537,7 @@ function tests.run(suite,check,eq,near)
     local g,_,b,a,s=fixture("inverter","ranged",{battery={capacity=3,fillRate=60,initialCharge=0}})
     M.set(a,"subclass","multi") M.set(a,"count",3) M.set(a,"spread",60)
     local r,h=world(g)
-    near("pre-Striker Multi battery tick marks the full volley",r.info[b.id].startupCosts[1],3)
+    near("pre-Striker Multi battery tick marks the full volley",r.info[b.id].startRequirements[1],3)
     ticks(r,2,false)
     eq("low charge never emits a partial Multi volley",r.stats.fired,0)
     near("skipped volleys preserve charge for the full pattern",r.sequences[1].energy,2)
@@ -567,7 +568,7 @@ function tests.run(suite,check,eq,near)
     M.set(b,"capacity",5) M.set(b,"initialCharge",1) M.set(b,"fillRate",0)
     r=world(g) ticks(r,1,true)
     eq("nested pre-Striker Multi cannot leak one affordable inner volley",r.stats.fired,0)
-    near("nested pre-Striker mark includes every strike",r.info[b.id].startupCosts[1],6)
+    near("nested pre-Striker mark includes every strike",r.info[b.id].startRequirements[1],6)
     M.set(b,"capacity",6) r=world(g) ticks(r,1,true)
     eq("nested pre-Striker Multi starts all six strikes",r.stats.fired,6)
     near("nested Multi does not charge twice",r.sequences[1].energy,0)
@@ -577,17 +578,17 @@ function tests.run(suite,check,eq,near)
     M.set(b,"capacity",3) r,h=world(g) ticks(r,1,true)
     eq("combined orders start three logical strikes",r.stats.fired,3)
     eq("each of those strikes splits into two colliders",#h.spawned,6)
-    near("post-Striker split does not inflate the pre-Striker cost mark",r.info[b.id].startupCosts[1],3)
+    near("post-Striker split does not inflate the pre-Striker cost mark",r.info[b.id].startRequirements[1],3)
     near("combined orders pay just three startups",r.sequences[1].energy,0)
     near("combined orders halve each child's output",h.spawned[1].share,0.5)
 
     local mixed,_,battery,multi=fixture("single","ranged",{battery={capacity=5,fillRate=0}})
     M.set(multi,"subclass","multi") M.set(multi,"count",3)
-    local expensive=node(mixed,"striker","ranged",{startupCost=4,sizeCost=0,draw=0,distanceCost=0})
+    local expensive=node(mixed,"striker","ranged",{startEnergy=4,drainRate=0,})
     wire(mixed,multi,expensive,2)
     local rt=world(mixed) ticks(rt,1,true)
     eq("differently priced lanes are still an indivisible volley",rt.stats.fired,0)
-    near("mixed-lane mark counts cyclic routing and each cost",rt.info[battery.id].startupCosts[1],6)
+    near("mixed-lane mark counts cyclic routing and each cost",rt.info[battery.id].startRequirements[1],6)
     M.set(battery,"capacity",6) rt=world(mixed) ticks(rt,1,true)
     eq("mixed-lane volley starts at its combined threshold",rt.stats.fired,3)
     near("mixed-lane reservation pays the actual total",rt.sequences[1].energy,0)
@@ -609,7 +610,7 @@ function tests.run(suite,check,eq,near)
     local r,h=world(g) ticks(r,1,true)
     eq("one startup funds a complete post-Striker split",r.stats.fired,1)
     eq("one funded strike produces all three colliders",#h.spawned,3)
-    near("post-Striker battery tick marks one startup",r.info[b.id].startupCosts[1],1)
+    near("post-Striker battery tick marks one startup",r.info[b.id].startRequirements[1],1)
     near("post-Striker split pays startup only once",r.sequences[1].energy,0)
     near("each split child receives a third of output",h.spawned[1].share,1/3)
     check("split children are visibly dimmer",h.spawned[1].state.brightness<1)
@@ -620,12 +621,12 @@ function tests.run(suite,check,eq,near)
 
     -- Identical payload coverage spends and deals one strike's total energy.
     g,_,b,a,s=split()
-    local payload=node(g,"payload","sharp",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    local payload=node(g,"payload","sharp",{damage=12,effect="none"}) wire(g,a,payload)
     local targets={target(10*math.cos(math.rad(30)),-5),target(10),target(10*math.cos(math.rad(30)),5)}
     r,h=world(g,targets) ticks(r,20,true)
     near("three split hits deal one full strike's damage",h.damageTotal,12)
     for i,e in ipairs(targets) do near("split child "..i.." deals one-third damage",e.hp,96) end
-    near("payload costs are divided along with damage",r.sequences[1].energy,93)
+    near("payload hits never debit the battery",r.sequences[1].energy,99)
     eq("split hits accumulate into the original strike",r.stats.hits,3)
     eq("split hit volley completes once",r.stats.completed,1)
     eq("hit volley never qualifies as a Miss",r.stats.misses,0)
@@ -640,7 +641,7 @@ function tests.run(suite,check,eq,near)
       ticks(r,25,false)
       eq(event.." activates only once and obeys aggregate hit count",r.stats.fired,event=="complete" and 2 or 1)
       near("downstream reservoir is charged only by its own event",r.sequences[2].energy,event=="complete" and 9 or 10)
-      near("downstream battery mark remains independent",r.info[childBattery.id].startupCosts[1],1)
+      near("downstream battery mark remains independent",r.info[childBattery.id].startRequirements[1],1)
     end
     g,_,b,a,s=split() downstream(g,s,"miss",10)
     r=world(g) ticks(r,30,true)
@@ -657,11 +658,11 @@ function tests.run(suite,check,eq,near)
     near("nested shares add to exactly one original output",sum,1)
     near("nested leaf gets one sixth",h.spawned[1].share,1/6)
     near("unsplit sibling keeps its half",h.spawned[4].share,0.5)
-    near("nested splits do not inflate startup mark",r.info[b.id].startupCosts[1],1)
+    near("nested splits do not inflate startup mark",r.info[b.id].startRequirements[1],1)
 
-    g,_,b,a,s=split({striker={draw=6,distanceCost=0.1}})
+    g,_,b,a,s=split({striker={drainRate=6,}})
     r,h=world(g) ticks(r,5,true)
-    near("split travel and continuing work share one total draw",r.sequences[1].energy,98)
+    near("split projectiles travel without any further charge",r.sequences[1].energy,99)
     near("initial split tuning preserves speed and reach",h.spawned[1].dist,5)
 
     g,_,b,a,s=split({striker={hitLimit=2}},"single","piercing") M.set(a,"spread",0)
@@ -670,10 +671,10 @@ function tests.run(suite,check,eq,near)
     eq("split piercing has one completion after all children finish",r.stats.completed,1)
     eq("piercing Complete includes all children's contacts",r.log[#r.log].hitCount,6)
 
-    g,_,b,a,s=split({battery={capacity=2,fillRate=0}},"toggle","stab")
-    payload=node(g,"payload","sharp",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    g,_,b,a,s=split({battery={capacity=2,fillRate=0},striker={drainRate=12}},"toggle","stab")
+    payload=node(g,"payload","sharp",{damage=12,effect="none"}) wire(g,a,payload)
     r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,10,false)
-    eq("payload depletion ends every beam sharing the empty split",#r.strikes,0)
+    eq("configured drain ends every beam sharing the empty split",#r.strikes,0)
     eq("an empty battery cannot restart any split child",#h.spawned,3)
     eq("depleting a split emits one completion",r.stats.completed,1)
     r:clear()
@@ -682,17 +683,17 @@ function tests.run(suite,check,eq,near)
 
     -- Continuous damage also shares the budget on every tick.
     g,_,b,a,s=split(nil,"toggle","stab") M.set(a,"spread",0)
-    payload=node(g,"payload","plasma",{energy=6,efficiency=2,effect="none"}) wire(g,a,payload)
+    payload=node(g,"payload","plasma",{damage=12,effect="none"}) wire(g,a,payload)
     r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,9,false)
     near("split beams share total damage per second",h.damageTotal,2)
-    near("split beams share total payload draw without an upfront deduction",r.sequences[1].energy,99)
+    near("split payloads never add battery draw",r.sequences[1].energy,100)
     eq("same-target contacts from separate children each count once",r.stats.hits,3)
     M.set(s,"releaseEnds",true) ticks(r,1,true)
     eq("release ends all split children with one completion",r.stats.completed,1)
     eq("release removes every split collider",#r.strikes,0)
     eq("release Complete retains their combined hit count",r.log[#r.log].hitCount,3)
 
-    g,_,b,a,s=split({battery={capacity=2,fillRate=0},striker={draw=60}},"toggle","stab")
+    g,_,b,a,s=split({battery={capacity=2,fillRate=0},striker={drainRate=60}},"toggle","stab")
     r,h=world(g) ticks(r,1,true)
     eq("split beam starts every child together",#r.strikes,3)
     ticks(r,1,false)
@@ -715,13 +716,99 @@ function tests.run(suite,check,eq,near)
   suite("mws v2: payloads and release")
   do
     local g,_,_,_,s=fixture("toggle","stab",{striker={releaseEnds=true,range=20}})
-    local p=node(g,"payload","plasma",{energy=6,efficiency=2}) wire(g,s,p)
+    local p=node(g,"payload","plasma",{damage=12}) wire(g,s,p)
     local r,h=world(g,{target(5)}) ticks(r,1,true) ticks(r,9,false)
     eq("sustained hit count counts distinct targets",r.stats.hits,1)
-    near("plasma damage is funded every contact tick",h.damageTotal,2)
+    near("plasma applies its configured DPS every contact tick",h.damageTotal,2)
     ticks(r,1,true)
     eq("second toggle press ends a release-sensitive strike",r.log[#r.log].reason,"release")
     eq("completion retains sustained hit count",r.log[#r.log].hitCount,1)
+  end
+  suite("mws v2: replacement energy contracts")
+  do
+    for _,kind in ipairs({"sharp","impact","plasma"}) do
+      local g,_,_,_,s=fixture("single","piercing",{
+        battery={capacity=5,fillRate=0},striker={startEnergy=5,hitLimit=3}})
+      local payload=node(g,"payload",kind,{damage=11,effect="none"}) wire(g,s,payload)
+      local r,h=world(g,{target(5),target(12)}) ticks(r,1,true)
+      near(kind.." exact shot payment empties battery once",r.sequences[1].energy,0)
+      near(kind.." paid projectile moves on its first tick",h.spawned[1].dist,1)
+      ticks(r,25,false)
+      near(kind.." every piercing contact deals full configured damage",h.damageTotal,22)
+      near(kind.." hits and travel leave empty battery unchanged",r.sequences[1].energy,0)
+      eq(kind.." projectile ends at range rather than energy",r.log[#r.log].reason,"range")
+      eq(kind.." lifetime emits one completion",r.stats.completed,1)
+    end
+    -- Same reservoir, different beam rates, either graph order and any target
+    -- count: every beam receives the same final fraction of simulation time.
+    for _,reverse in ipairs({false,true}) do
+      for _,count in ipairs({0,1,4}) do
+        local g,_,_,a,s=fixture("single","stab",{
+          battery={capacity=1,fillRate=0},striker={startEnergy=0.1,drainRate=2}})
+        M.set(a,"subclass","multi") M.set(a,"count",2) M.set(a,"spread",0)
+        local other=node(g,"striker","stab",{startEnergy=0.1,drainRate=6,
+          radius=1,range=20,duration=3,releaseEnds=false})
+        wire(g,a,other,2)
+        for _,striker in ipairs({s,other}) do
+          wire(g,striker,node(g,"payload","plasma",{damage=8,effect="none"}))
+        end
+        if reverse then a.outputs[1],a.outputs[2]=a.outputs[2],a.outputs[1] end
+        local targets={} for i=1,count do targets[i]=target(1) end
+        local r,h=world(g,targets) ticks(r,1,true) ticks(r,20,false)
+        near("all beam rates share a predictable reservoir lifetime",h.spawned[1].age,0.125)
+        near("creation order cannot starve another beam",h.spawned[2].age,0.125)
+        near("target count changes damage without changing battery drain",h.damageTotal,2*count)
+        near("shared drain ends at zero",r.sequences[1].energy,0)
+        eq("each exhausted logical beam completes once",r.stats.completed,2)
+      end
+    end
+    for _,mode in ipairs({"stab","sweep","area","orbit"}) do
+      local g=fixture("single",mode,{battery={capacity=1,fillRate=0},
+        striker={startEnergy=1,drainRate=6,duration=0.051}})
+      local r,h=world(g) ticks(r,1,true) ticks(r,8,false)
+      near(mode.." drains only for its actual duration",r.sequences[1].energy,1-6*0.051)
+      near(mode.." final partial tick respects duration",h.spawned[1].age,0.051)
+      eq(mode.." completes by duration while charge remains",r.log[#r.log].reason,"duration")
+    end
+    local g,_,_,a,s=fixture("single","stab",{battery={capacity=0.2,fillRate=0},
+      striker={startEnergy=0.1,drainRate=0}})
+    M.set(a,"subclass","multi") M.set(a,"count",2)
+    local other=node(g,"striker","stab",{startEnergy=0.1,drainRate=200,releaseEnds=false})
+    wire(g,a,other,2)
+    local r,h=world(g) ticks(r,1,true) ticks(r,5,false)
+    near("zero-drain strike advances normally alongside an exhausting beam",h.spawned[1].age,0.1)
+    eq("zero-drain strike remains alive with empty reservoir",h.spawned[1].alive,true)
+  end
+  suite("mws v2: retired cost settings cannot leak into the new model")
+  do
+    local g,_,_,_,s=fixture()
+    local p=node(g,"payload","impact",{damage=12}) wire(g,s,p)
+    local saved=G.toTable(g)
+    saved.nodes[4].props={subclass="ranged",startupCost=5,draw=200,
+      sizeCost=1,distanceCost=1,weight=10,radius=20,speed=500,range=500}
+    saved.nodes[5].props={subclass="impact",energy=6,efficiency=2}
+    local restored,dropped=G.fromTable(saved)
+    local striker=restored.nodes[s.id]
+    near("saved startup becomes the single explicit shot payment",striker.props.startEnergy,5)
+    near("saved payload converts to direct damage",restored.nodes[p.id].props.damage,12)
+    eq("recognized old settings migrate without unknown-property errors",#dropped,0)
+    eq("loading does not rewrite the supplied saved data",saved.nodes[4].props.startupCost,5)
+    for _,key in ipairs({"startupCost","draw","sizeCost","distanceCost","weight","drainRate"}) do
+      eq("projectiles discard retired charge "..key,striker.props[key],nil)
+    end
+    local encoded=require("lib.json").encode(G.toTable(restored))
+    check("saved output contains only the new cost model",not encoded:find('startupCost')
+      and not encoded:find('distanceCost') and not encoded:find('efficiency'))
+    saved.nodes[4].props.subclass="area"
+    restored=G.fromTable(saved)
+    near("old field draw becomes its single sustained drain",restored.nodes[s.id].props.drainRate,200)
+    M.set(striker,"subclass","stab")
+    eq("switching to a beam adds the drain control",striker.props.drainRate,4)
+    M.set(striker,"subclass","ranged")
+    eq("switching back removes the beam-only drain",striker.props.drainRate,nil)
+    local known={}
+    for _,prop in ipairs(M.props("payload","impact")) do known[prop.name]=true end
+    check("payload editor exposes damage with no energy conversion controls",known.damage and not known.energy and not known.efficiency)
   end
   suite("mws v2: editable graphs and game integration")
   do
@@ -777,7 +864,7 @@ function tests.run(suite,check,eq,near)
           elseif n.type=="battery" then
             M.set(n,"capacity",18) M.set(n,"fillRate",16) M.set(n,"initialCharge",0)
           elseif n.type=="striker" then
-            M.set(n,"subclass","stab") M.set(n,"startupCost",8) M.set(n,"draw",87.2)
+            M.set(n,"subclass","stab") M.set(n,"startEnergy",8) M.set(n,"drainRate",87.2)
             striker=n
           end
         end
@@ -792,7 +879,7 @@ function tests.run(suite,check,eq,near)
           -- Counting spawn events alone hid the original same-tick death.
           for _,s in ipairs(state.run.strikes) do
             visible[s]=(visible[s] or 0)+1
-            belowThreshold=belowThreshold or rt.sequences[1].energy<V.startup(striker)
+            belowThreshold=belowThreshold or rt.sequences[1].energy<require("framework.mws.v2energy").required(striker)
             short=short or (s.reach>0 and s.reach<striker.props.range)
             full=full or s.reach==striker.props.range
           end

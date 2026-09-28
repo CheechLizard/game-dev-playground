@@ -58,12 +58,16 @@ function S.run(suite,check,eq,near)
   do
     local r,w,g,p=world("sharp")
     local target=r:spawnEnemy("grunt",80,40) target.hp=1000
-    M.set(p,"energy",100) r:buildWeaponGraph(w,g)
-    for _=1,12 do r:update(1/60,0,0) end
+    M.set(g.nodes[g.order[1]],"subclass","single")
+    local battery=g.nodes[g.order[2]]
+    M.set(battery,"capacity",8) M.set(battery,"fillRate",0)
+    M.set(p,"damage",100) r:buildWeaponGraph(w,g)
+    for _=1,20 do r:update(1/60,0,0) end
     local hit=false
     for _,v in ipairs(r.feedback.sounds) do if v.kind=="hit" then hit=true end end
-    check("unfunded contact does not claim damage with a hit sound",not hit)
-    eq("unfunded contact leaves HP intact",target.hp,1000)
+    check("fully paid projectile has impact audio even with an empty battery",hit)
+    eq("fully paid projectile applies its configured damage",target.hp,900)
+    near("damage never charges the empty reservoir",w.mws.sequences[1].energy,0)
     G.removeNode(g,p.id) r:buildWeaponGraph(w,g) r.strikes={} F.reset(r)
     r:update(1/60,0,0)
     eq("payload-free strike is neutral",r.strikes[1].payloadIds[1],"none")
