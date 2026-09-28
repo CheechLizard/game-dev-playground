@@ -40,6 +40,7 @@ function R:context(seq,event)
 end
 function R:rebuild()
   self:clear()
+  self.generation=(self.generation or 0)+1
   self.sequences,self.info,self.problems=G.compile(self.graph)
   self.valid=true
   for _,p in ipairs(self.problems) do if p.level=="error" then self.valid=false end end
@@ -54,6 +55,7 @@ function R:rebuild()
     end
     if not seq.parent then self:context(seq) end
   end
+  if self.host.rebuilt then self.host.rebuilt(self) end
 end
 function R:pay(seq,amount)
   if seq.energy+1e-8<amount then return false end
@@ -224,6 +226,8 @@ function R:emit(s,kind,reason,target,nx,ny,contactX,contactY)
     dx=s.dirX,dy=s.dirY,nx=nx,ny=ny,target=target,striker=s.node.id,sequence=s.seq.id}
   if target then e.x,e.y=contactX or target.x,contactY or target.y end
   self.log[#self.log+1]=e if #self.log>40 then table.remove(self.log,1) end
+  if self.host.trace then self.host.trace(kind,s,{reason=reason,hitCount=e.hitCount,
+    miss=kind=="complete" and e.hitCount==0,target=target and target.id}) end
   for _,seq in ipairs(self.sequences) do
     if seq.parent==s.node.id then
       local sub=seq.root.props.subclass
@@ -238,6 +242,7 @@ end
 function R:finish(s,reason)
   if not s.alive then return end
   s.alive=false
+  s.endReason=reason
   local group=s.group
   group.remaining=group.remaining-1
   if group.remaining==0 then

@@ -1,19 +1,32 @@
 -- Bounded cosmetic data. Never draws, plays audio, or consumes gameplay RNG.
 local config=require("framework.config")
 local payloads=require("payloads")
+local diagnostics=require("diagnostics")
 local F={}
 local function append(list,item,limit)
   if #list>=limit then table.remove(list,1) end
   list[#list+1]=item
 end
 function F.reset(r)
+  for _,event in ipairs(r.feedback and r.feedback.sounds or {}) do
+    diagnostics.sound(r,event,"suppressed",{reason="feedback_reset"})
+  end
+  diagnostics.record(r,"feedback_reset")
   r.feedback={flashes={},particles={},trails={},sounds={}}
 end
 local function enabled() return config.get("feedback.enabled")~=false end
-function F.sound(r,kind,id,power)
-  if config.get("audio.enabled")==false then return end
-  append(r.feedback.sounds,{kind=kind,id=id,power=power or 1,
-    pitch=0.97+r.feedbackRng.next()*0.06},32)
+function F.sound(r,kind,id,power,strike,causeEvent,cause)
+  local event={kind=kind,id=id,power=power or 1,strike=strike,
+    causeEvent=causeEvent,cause=cause}
+  if config.get("audio.enabled")==false then
+    diagnostics.sound(r,event,"suppressed",{reason="audio_disabled"}) return
+  end
+  event.pitch=0.97+r.feedbackRng.next()*0.06
+  if #r.feedback.sounds>=32 then
+    diagnostics.sound(r,r.feedback.sounds[1],"suppressed",{reason="queue_limit"})
+  end
+  event.queuedEvent=diagnostics.sound(r,event,"queued")
+  append(r.feedback.sounds,event,32)
 end
 function F.launch(r,s)
   s.payloadIds=s.payloadIds or payloads.strike(s)
@@ -21,22 +34,28 @@ function F.launch(r,s)
   local id=s.payloadIds[1]
   local mode=s.v2 and s.node.props.subclass
   local power=s.state.brightness or 1
+  local cause=diagnostics.strikeEvent(r,"strike_start",s)
   if enabled() then
     append(r.feedback.flashes,{kind="muzzle",id=id,x=s.x,y=s.y,
       dx=s.dirX,dy=s.dirY,power=power,age=0,life=0.075},80)
   end
-  F.sound(r,mode=="sweep" and "sweep" or "shot",id,power)
+  F.sound(r,mode=="sweep" and "sweep" or "shot",id,power,s,cause,"strike_start")
 end
 function F.hit(r,s,e,id,critical)
   id=id or (s.payloadIds and s.payloadIds[1]) or "sharp"
+  local cause=diagnostics.strikeEvent(r,"damage",s,{payload=id,target=e.id,
+    targetX=e.x,targetY=e.y,killed=e.dead==true,critical=critical==true})
   -- Sustained payloads may deal damage every tick. Feedback is per target and
   -- family, with a short cooldown; a lethal tick always gets its own cue.
   e.feedbackTimes=e.feedbackTimes or {}
-  if not e.dead and (e.feedbackTimes[id] or -1)>r.time then return end
+  if not e.dead and (e.feedbackTimes[id] or -1)>r.time then
+    diagnostics.sound(r,{kind="hit",id=id,strike=s,causeEvent=cause,cause="damage"},
+      "suppressed",{reason="target_cooldown"}) return
+  end
   e.feedbackTimes[id]=r.time+0.09
   local power=(s.state and s.state.brightness) or 1
   local kill=e.dead
-  F.sound(r,kill and "kill" or "hit",id,power)
+  F.sound(r,kill and "kill" or "hit",id,power,s,cause,kill and "kill" or "damage")
   if not enabled() then return end
   local dx,dy=s.dirX or 1,s.dirY or 0
   append(r.feedback.flashes,{kind=kill and "kill" or "hit",id=id,

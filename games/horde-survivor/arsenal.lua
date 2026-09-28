@@ -219,6 +219,8 @@ function arsenal.host(r, weapon)
 
     despawn = function(strike)
       strike.dead = true
+      require("diagnostics").strikeEvent(r,"strike_end",strike,
+        {reason=strike.endReason or "rebuild",hitCount=strike.hitCount or 0})
     end,
 
     --- PAYLOAD fired. Direct damage is applied by the collision that caused
@@ -242,6 +244,13 @@ end
 function arsenal.instance(r, weapon, g)
   if g.version==2 then
     local host=arsenal.host(r,weapon)
+    host.rebuilt=function(rt)
+      require("diagnostics").record(r,"weapon_rebuild",{weapon=weapon.id,
+        generation=rt.generation,graphId=rt.graph.id})
+    end
+    host.trace=function(kind,strike,fields)
+      require("diagnostics").strikeEvent(r,kind,strike,fields)
+    end
     host.enemies=function() return r.enemies end
     host.random=function() return r.rng.next() end
     host.damage=function(strike,target,damage,payload)

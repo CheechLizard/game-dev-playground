@@ -133,6 +133,8 @@ function run:reset()
   self.strikes = {}
   self.effects = {}
   self.particles = {}
+  self.feedback=nil
+  require("diagnostics").reset(self)
   feedback.reset(self)
   self.enemyShots = {}
   self.pickups = {}

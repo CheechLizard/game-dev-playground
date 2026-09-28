@@ -25,10 +25,12 @@ local perf = require("framework.perf")
 local input = require("framework.input")
 local ui = require("framework.ui")
 local fonts = require("framework.fonts")
+local MCP = require("framework.mcp")
 
 local DEFAULT_GAME = "horde-survivor"
 
 local game
+local inspection
 local canvas
 local scale, offsetX, offsetY = 1, 0, 0
 
@@ -88,6 +90,10 @@ function love.load()
     game = game, config = config, schema = require("framework.schema"),
     profiles = profiles, editor = editor, debugdraw = debugdraw, input = input,
   })
+  inspection=MCP.new({source=love.filesystem.getSource(),
+    call=function(name,args) return game.inspect(name,args) end})
+  editor.action{page="Debug",section="Live inspection",label="Check inspection connection",
+    fn=function() editor.notify(inspection.status) end}
 end
 
 function love.resize()
@@ -122,6 +128,12 @@ function love.update(dt)
   capture.advance(game.update, { editor = editor, input = input })
 
   frame(dt, not capture.frozen())
+  inspection:configure(config.get("mcp.enabled") and not capture.active(),config.get("mcp.port"))
+  inspection:update()
+end
+
+function love.quit()
+  if inspection then inspection:close() end
 end
 
 function love.draw()

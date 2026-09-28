@@ -324,6 +324,13 @@ function M.register()
   -- Debug values live here with every other setting so they exist in headless
   -- runs too; the Debug page's buttons are registered in game.lua, because
   -- they act on the live run rather than on a value.
+  register("Debug", "Live inspection", 5, {
+    {key="mcp.enabled",label="Allow local inspection",type="bool",default=true,
+      help="Read-only MCP access to live settings, weapon graphs and event history on this computer."},
+    {key="mcp.port",label="Inspection port",type="int",default=49321,min=1024,max=65535,
+      help="Local MCP address: http://127.0.0.1:<port>/mcp. Use a different port for another game instance."},
+  })
+
   register("Debug", "Simulation", 10, {
     { key = "debug.timeScale", label = "Time scale", type = "number",
       default = 1, min = 0, max = 5, format = "%.2f", unit = "x",

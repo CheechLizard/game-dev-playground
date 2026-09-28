@@ -121,6 +121,23 @@ non-zero, rather than sitting on LÖVE's error screen until something kills it.
 `F7` takes the same screenshot while playing, named by timestamp. It prints the
 path; there is no on-screen confirmation, because the play surface stays clear.
 
+## Inspect the running game through MCP
+
+The app exposes live settings, unsaved weapon graphs, battery/trigger state,
+and a correlated strike/sound history at `http://127.0.0.1:49321/mcp`.
+It is read-only and local to this computer. Controls are under
+**F1 → Debug → Live inspection**. The server remains available while paused;
+automated capture runs keep it off.
+
+```sh
+codex mcp add game-dev-playground --url http://127.0.0.1:49321/mcp
+python3 tools/inspect.py config
+python3 tools/inspect.py events --limit 100
+```
+
+See [Live inspection](docs/Live_Inspection.md) for tools, connection setup,
+event meanings, and how to identify the correct running instance.
+
 ## The zoo and the range
 
 Two inspection levels, both built on the same room grid and both running the

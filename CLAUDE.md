@@ -62,6 +62,14 @@ inspection levels.
 
 ## Seeing the game
 
+**For a bug in a currently running game, inspect its live MCP data first.**
+The endpoint is `http://127.0.0.1:49321/mcp`; `python3 tools/inspect.py config`,
+`runtime`, and `events` use it directly if the client's tools have not reloaded.
+Check `instance.source` and `world.mode`. Unsaved module edits exist only in the
+live graph; a saved preset or a scripted screenshot is not proof about that
+setup. If inspection is unavailable, report that rather than substituting a
+different weapon configuration. See `docs/Live_Inspection.md`.
+
 **Do not request or use accessibility control of the user's machine.** Capture
 the game's own frame through Lua. No desktop automation is needed for this project.
 

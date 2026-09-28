@@ -2,6 +2,11 @@
 -- Encoding sorts object keys so profile files produce stable git diffs.
 
 local json = {}
+local arrayType = {}
+-- Protocols need to distinguish empty arrays and explicit null from objects.
+-- Unmarked empty tables retain the profile format's existing {} behaviour.
+json.null = {}
+function json.array(values) return setmetatable(values or {}, arrayType) end
 
 local escapes = {
   ['"'] = '\\"', ['\\'] = '\\\\', ['\b'] = '\\b',
@@ -17,6 +22,7 @@ end
 -- An empty Lua table is ambiguous. Profiles encode objects far more often than
 -- arrays, and "no overrides" must serialise as {}, so empty means object.
 local function isArray(t)
+  if getmetatable(t) == arrayType then return true end
   local n = 0
   for k in pairs(t) do
     if type(k) ~= "number" then return false end
@@ -24,6 +30,7 @@ local function isArray(t)
   end
   return n > 0 and n == #t
 end
+json.isArray = isArray
 
 local function encodeNumber(n)
   if n ~= n or n == math.huge or n == -math.huge then
@@ -68,7 +75,7 @@ end
 
 encodeValue = function(v, indent, out)
   local t = type(v)
-  if v == nil then out[#out + 1] = "null"
+  if v == nil or v == json.null then out[#out + 1] = "null"
   elseif t == "boolean" then out[#out + 1] = tostring(v)
   elseif t == "number" then out[#out + 1] = encodeNumber(v)
   elseif t == "string" then out[#out + 1] = escapeString(v)
@@ -87,8 +94,8 @@ end
 local Parser = {}
 Parser.__index = Parser
 
-function Parser.new(s)
-  return setmetatable({ s = s, i = 1 }, Parser)
+function Parser.new(s, preserveNull)
+  return setmetatable({ s = s, i = 1, preserveNull = preserveNull }, Parser)
 end
 
 function Parser:error(msg)
@@ -187,7 +194,7 @@ function Parser:parseValue()
     end
   elseif c == "[" then
     self.i = self.i + 1
-    local arr = {}
+    local arr = json.array()
     self:skip()
     if self:peek() == "]" then self.i = self.i + 1 return arr end
     while true do
@@ -202,7 +209,10 @@ function Parser:parseValue()
     return self:parseString()
   elseif self.s:find("^true", self.i) then self.i = self.i + 4 return true
   elseif self.s:find("^false", self.i) then self.i = self.i + 5 return false
-  elseif self.s:find("^null", self.i) then self.i = self.i + 4 return nil
+  elseif self.s:find("^null", self.i) then
+    self.i = self.i + 4
+    if self.preserveNull then return json.null end
+    return nil
   elseif c:match("[%-%d]") then
     return self:parseNumber()
   end
@@ -210,9 +220,9 @@ function Parser:parseValue()
 end
 
 --- Decode a JSON string. Returns value, or nil plus an error message.
-function json.decode(s)
+function json.decode(s, preserveNull)
   if type(s) ~= "string" then return nil, "json: expected string" end
-  local p = Parser.new(s)
+  local p = Parser.new(s, preserveNull)
   local ok, result = pcall(function()
     local v = p:parseValue()
     p:skip()

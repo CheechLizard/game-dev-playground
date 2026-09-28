@@ -144,6 +144,12 @@ function game.togglePause()
   return paused
 end
 
+function game.inspect(name,args)
+  return require("inspection").call(name,args,{mode=mode,paused=game.isPaused(),
+    run=benchState and benchState.run or sandboxState and sandboxState.run or current,
+    bench=benchState})
+end
+
 -- ------------------------------------------------------------- registration
 
 local function registerDebugActions()

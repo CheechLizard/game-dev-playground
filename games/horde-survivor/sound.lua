@@ -2,6 +2,7 @@
 -- Only this presentation adapter touches love.audio; the run queues data.
 local config=require("framework.config")
 local P=require("payloads")
+local diagnostics=require("diagnostics")
 local A={cache={},voices={},cooldowns={},clock=0}
 local RATE=22050
 -- Pure sampler also lets headless tests check envelopes and signal bounds.
@@ -46,21 +47,32 @@ local function source(id,kind)
   end
   return A.cache[key]
 end
-function A.stop()
+function A.stop(reason)
   for _,v in ipairs(A.voices) do v:stop() end
   A.voices={}
-  if A.hum then A.hum:stop() A.hum=nil end
+  if A.hum then
+    A.hum:stop() A.hum=nil
+    diagnostics.sound(A.owner,{kind="hum",id="plasma"},"stopped",
+      {reason=reason or "reset",contributors=A.humStrikes})
+  end
+  A.humStrikes=nil
   A.cooldowns={}
 end
-local function play(event,c)
+local function play(event,c,r)
   local key=event.kind..":"..event.id
-  if (A.cooldowns[key] or 0)>A.clock then return end
-  if #A.voices>=c.voices then return end
+  if (A.cooldowns[key] or 0)>A.clock then
+    diagnostics.sound(r,event,"suppressed",{reason="sound_cooldown"}) return
+  end
+  if #A.voices>=c.voices then
+    diagnostics.sound(r,event,"suppressed",{reason="voice_limit"}) return
+  end
   A.cooldowns[key]=A.clock+(event.kind=="shot" and 0.045 or 0.075)
   local v=source(event.id,event.kind):clone()
   local group=(event.kind=="shot" or event.kind=="sweep") and c.shots or c.hits
-  v:setVolume(c.volume*group*math.min(1,event.power or 1))
+  local volume=c.volume*group*math.min(1,event.power or 1)
+  v:setVolume(volume)
   v:setPitch(event.pitch or 1) v:play()
+  diagnostics.sound(r,event,"played",{volume=volume,audible=volume>0})
   A.voices[#A.voices+1]=v
 end
 function A.update(r,dt,active)
@@ -69,29 +81,47 @@ function A.update(r,dt,active)
   if f then f.sounds={} end
   local c=config.values.audio
   if A.owner~=r or A.generation~=(r and r.feedback) then
-    A.stop() A.owner=r A.generation=r and r.feedback
+    A.stop("world_changed") A.owner=r A.generation=r and r.feedback
   end
   if not active or not c or not c.enabled or c.volume<=0
-    or not (love and love.audio and love.sound) then A.stop() return end
+    or not (love and love.audio and love.sound) then
+    local reason=not active and "inactive" or (not c or not c.enabled) and "audio_disabled"
+      or c.volume<=0 and "muted" or "audio_unavailable"
+    for _,e in ipairs(events) do diagnostics.sound(r,e,"suppressed",{reason=reason}) end
+    A.stop(reason) return
+  end
   A.clock=A.clock+dt
   local live={}
   for _,v in ipairs(A.voices) do if v:isPlaying() then live[#live+1]=v end end
   A.voices=live
-  for _,e in ipairs(events) do play(e,c) end
+  for _,e in ipairs(events) do play(e,c,r) end
   local power=0
+  local contributors=require("lib.json").array()
   for _,s in ipairs(r.strikes) do
     if s.alive and s.sustained and s.payloadIds then
       for _,id in ipairs(s.payloadIds) do
-        if id=="plasma" then power=math.max(power,s.state.brightness or 1) end
+        if id=="plasma" then
+          power=math.max(power,s.state.brightness or 1)
+          contributors[#contributors+1]=diagnostics.strike(r,s).strike
+        end
       end
     end
   end
   if power>0 and c.beams>0 then
-    if not A.hum then A.hum=source("plasma","hum"):clone() A.hum:setLooping(true) A.hum:play() end
+    if not A.hum then
+      A.hum=source("plasma","hum"):clone() A.hum:setLooping(true) A.hum:play()
+      diagnostics.sound(r,{kind="hum",id="plasma",cause="active_plasma"},"played",
+        {looping=true,contributors=contributors,volume=c.volume*c.beams*power})
+    end
+    A.humStrikes=contributors
     A.hum:setVolume(c.volume*c.beams*power)
   elseif A.hum then
     A.hum:stop() A.hum=nil
-    play({id="plasma",kind="tail",power=1},c)
+    local reason=power==0 and "no_active_plasma" or "beam_volume_zero"
+    local stopped=diagnostics.sound(r,{kind="hum",id="plasma"},"stopped",
+      {reason=reason,contributors=A.humStrikes})
+    A.humStrikes=nil
+    play({id="plasma",kind="tail",power=1,cause=reason,causeEvent=stopped},c,r)
   end
 end
 return A

@@ -352,6 +352,11 @@ local feedbackOk, feedbackErr=pcall(function()
 end)
 if not feedbackOk then suite("combat feedback") check("feedback suite completed",false,feedbackErr) end
 
+local mcpOk,mcpErr=pcall(function()
+  require("tools.mcpsuite").run(suite,check,eq,near)
+end)
+if not mcpOk then suite("MCP inspection") check("MCP suite completed",false,mcpErr) end
+
 -- ------------------------------------------------------------------ done
 
 io.write(string.format("\n%d passed, %d failed\n", passed, failed))
