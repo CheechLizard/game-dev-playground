@@ -167,24 +167,29 @@ function S.run(suite,check,eq,near)
     r:update(1/60,0,0)
     eq("test strike dies before the first rendered frame",#r.strikes,0)
     A.update(r,1/60,true)
-    local events=r.trace:read(nil,100).events local start,complete,ended,played
+    local events=r.trace:read(nil,100).events local start,complete,ended,outcome
     for _,e in ipairs(events) do
       if e.kind=="strike_start" then start=e
       elseif e.kind=="complete" then complete=e
       elseif e.kind=="strike_end" then ended=e
-      elseif e.kind=="sound_played" then played=e end
+      elseif e.kind=="sound_played" or e.kind=="sound_suppressed" then outcome=e end
     end
     check("trace retains starts even when the strike is already dead",start~=nil)
     eq("completion records zero-hit Miss eligibility",complete.miss,true)
     eq("termination explains energy exhaustion",ended.reason,"energy")
     check("recorded lifetime is shorter than one frame",ended.age<1/60)
-    eq("audio records the sound actually played",played.sound,"shot")
-    eq("shot cause is ignition, not Miss",played.cause,"strike_start")
-    eq("audio links to the exact start event",played.causeEvent,start.id)
+    eq("unseen exhausted beam does not play a launch sound",outcome.kind,"sound_suppressed")
+    eq("suppression explains the pre-playback exhaustion",outcome.reason,"strike_exhausted_before_playback")
+    eq("suppressed launch is still identified as a shot",outcome.sound,"shot")
+    eq("shot cause is ignition, not Miss",outcome.cause,"strike_start")
+    eq("audio links to the exact start event",outcome.causeEvent,start.id)
     eq("start and end retain the same strike ID",start.strike,ended.strike)
-    eq("audio links to that same strike",played.strike,start.strike)
-    eq("audio exposes that its strike had already died",played.alive,false)
-    check("runtime generation separates rebuilt weapons",played.generation==w.mws.generation)
+    eq("audio links to that same strike",outcome.strike,start.strike)
+    eq("audio exposes that its strike had already died",outcome.alive,false)
+    check("runtime generation separates rebuilt weapons",outcome.generation==w.mws.generation)
+    eq("exhausted launch allocates no audio voice",#A.voices,0)
+    F.sound(r,"shot","sharp") A.update(r,1/60,true)
+    eq("suppressed launch does not consume the sound cooldown",r.trace:read(nil,1).events[1].kind,"sound_played")
     F.sound(r,"shot","sharp") A.update(r,1/60,true)
     local last=r.trace:read(nil,1).events[1]
     eq("cooldown suppression is distinct from playback",last.kind,"sound_suppressed")
@@ -192,6 +197,61 @@ function S.run(suite,check,eq,near)
     F.sound(r,"hit","sharp") A.update(r,1/60,false)
     last=r.trace:read(nil,1).events[1]
     eq("paused audio is traced as suppressed",last.reason,"inactive")
+
+    suite("live low-charge projectile audio regression")
+    -- Captured through MCP from the user's running main checkout. Targets
+    -- were outside this weapon's 180-unit reach, so no contacts are needed.
+    for _,fps in ipairs({30,60,144}) do
+      require("tools.simsuite").bootstrap()
+      r=Run.new(7) r.sandbox=true w=r.player.weapons[1]
+      graph=require("weaponprototypes").builders.v2_pulse()
+      M.set(graph.nodes[graph.order[1]],"subclass","toggle")
+      battery=graph.nodes[graph.order[2]]
+      M.set(battery,"capacity",60) M.set(battery,"fillRate",35)
+      M.set(battery,"initialCharge",1)
+      local barrel=graph.nodes[graph.order[3]]
+      M.set(barrel,"subclass","seeking") M.set(barrel,"turnSpeed",180)
+      striker=graph.nodes[graph.order[4]]
+      for key,value in pairs({subclass="ranged",startupCost=14.246875,
+        sizeCost=0.03,radius=3,weight=1,draw=8.125,distanceCost=0.01,
+        speed=150,range=180,duration=3}) do M.set(striker,key,value) end
+      r:buildWeaponGraph(w,graph)
+      for frame=1,30*fps do
+        r.fireSignal=frame<=math.ceil(fps/60) r:update(1/fps,0,0)
+        -- Stub voices have no wall-clock duration; expire last frame's ones.
+        for _,v in ipairs(A.voices) do v:stop() end
+        A.update(r,1/fps,true)
+      end
+      local sounds,ghosts,suppressed,zeroAge=0,0,0,0
+      for _,e in ipairs(r.trace:read(nil,500).events) do
+        if e.kind=="sound_played" and e.sound=="shot" then
+          sounds=sounds+1 if not e.alive then ghosts=ghosts+1 end
+        elseif e.kind=="sound_suppressed" and e.reason=="strike_exhausted_before_playback" then
+          suppressed=suppressed+1
+        elseif e.kind=="strike_end" and e.age==0 then zeroAge=zeroAge+1 end
+      end
+      check(fps.." FPS reproduces energy deaths before any movement",zeroAge>10)
+      check(fps.." FPS keeps audible launches for surviving strikes",sounds>5)
+      eq(fps.." FPS never plays a ghost launch",ghosts,0)
+      check(fps.." FPS records why failed launches stayed silent",suppressed>=zeroAge)
+    end
+
+    suite("immediate contact retains launch and damage audio")
+    require("tools.simsuite").bootstrap()
+    r=Run.new(7) r.sandbox=true r.stationaryEnemies=true w=r.player.weapons[1]
+    graph=require("weaponprototypes").builders.v2_pulse()
+    M.set(graph.nodes[graph.order[3]],"subclass","forward")
+    r:buildWeaponGraph(w,graph)
+    local target=r:spawnEnemy("grunt",r.player.x+5,r.player.y) target.hp=1000
+    r.player.facingX,r.player.facingY=1,0 r.fireSignal=true
+    r:update(1/60,0,0) A.update(r,1/60,true)
+    local shot,hit
+    for _,e in ipairs(r.trace:read(nil,100).events) do
+      if e.kind=="sound_played" and e.sound=="shot" then shot=e end
+      if e.kind=="sound_played" and e.sound=="hit" then hit=e end
+    end
+    check("point-blank hit keeps its launch sound after collider ends",shot and not shot.alive)
+    check("point-blank funded damage keeps its impact sound",hit~=nil)
   end)
   A.stop() A.cache=oldCache love=oldLove
   if not ok then error(err) end

@@ -250,6 +250,12 @@ payload node so mixed-payload hits have the right identity. Existing hosts may
 ignore the extra argument. Presentation never spends energy or changes collision
 geometry. A contact that cannot fund its payload produces no damage feedback.
 
+If a v2 strike exhausts before queued audio is played and has made no contact,
+its launch sound is suppressed. This prevents an invisible, immediately depleted
+collider from sounding like a successful shot. Immediate contacts retain their
+launch and funded damage sounds. Startup spending and Complete/Miss eligibility
+are unchanged; this is an audio presentation rule only.
+
 Burning, Corrosive, Freezing and Black Hole have reserved palette entries only;
 their mechanics and subclass availability are unchanged. Every colour and global
 feedback/audio control is schema-generated. Headless runs require no audio

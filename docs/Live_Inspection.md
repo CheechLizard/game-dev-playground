@@ -77,17 +77,19 @@ and `cursor` support pagination without duplicates.
 | `strike_end` | An individual v2 collider ended; reason includes energy, duration, release, or rebuild. |
 | `sound_queued` | A sound was requested. `causeEvent` links to its originating start or damage event. |
 | `sound_played` | The audio adapter started a source. Includes sound type and volume; `queuedEvent` links to its queue entry. It does not prove the physical audio device was audible. |
-| `sound_suppressed` | The request was not played; reason distinguishes target/sound cooldown, voice/queue limits, disabled audio, mute, reset or inactive playback. |
+| `sound_suppressed` | The request was not played; reason distinguishes exhaustion before playback, target/sound cooldown, voice/queue limits, disabled audio, mute, reset or inactive playback. |
 | `sound_stopped` | A sustained hum was stopped; includes its contributor strike IDs and reason. |
 | `weapon_rebuild` / `feedback_reset` | Boundaries caused by re-arming, resetting or switching a weapon. |
 
 In particular, a collider can start, exhaust and complete with zero hits before
-the next rendered frame, while its already queued **shot** sound still plays.
+the next rendered frame. Its queued launch sound is suppressed with reason
+`strike_exhausted_before_playback`, before consuming a voice or sound cooldown.
 That history contains `strike_start → sound_queued → complete → strike_end →
-sound_played` with matching strike IDs. The sound's cause remains
-`strike_start`; a Miss trigger did not itself make that sound. This server adds
-observability without changing those sound or energy rules. Full lifecycle
-tracing is for v2 strikes; legacy attacks also expose launch and damage audio.
+sound_suppressed` with matching strike IDs. The request's cause remains
+`strike_start`; a Miss trigger did not itself request a sound. Immediate contacts
+still retain their launch and funded damage sounds. Startup spending and Complete
+events are unchanged. Full lifecycle tracing is for v2 strikes; legacy attacks
+also expose launch and damage audio.
 
 ## Implementation and verification
 
@@ -106,5 +108,6 @@ receive 202. All tools declare read-only annotations.
 
 `luajit tools/test.lua` covers the protocol, local-origin restrictions, split
 network reads/writes, client timeouts, bounded event cursors, unsaved graph
-reads, and same-tick beam exhaustion correlated with actual audio playback.
+reads, same-tick beam exhaustion and launch suppression, and the captured
+low-charge projectile setup at 30, 60 and 144 FPS.
 Use `tools/inspect.py` against a running LÖVE instance to verify the full path.
