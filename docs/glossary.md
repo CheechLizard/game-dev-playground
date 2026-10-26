@@ -183,3 +183,18 @@ and Chain trigger below must not be used as definitions for the revised design.
 | **Combat feedback** | Bounded muzzle flashes, fading trails, directional hit particles and larger kill cues. Presentation data does not change damage, collision geometry or weapon energy. | `feedback.lua`, `feedbackdraw.lua` |
 | **Feedback random stream** | A cosmetic-only generator separate from both gameplay randomness and the older weapon-jitter stream. Sound variation and new impact particles cannot alter the simulation. | `run.feedbackRng` |
 | **Sound voice** | One simultaneous synthesized sound. Repeated events are coalesced, one-shots are capped, and one extra voice is reserved for sustained Plasma hum. | `sound.lua` |
+
+## Construct Atlas
+
+The illustrated design wiki in `docs/wiki/`. Its own vocabulary of game constructs lives on its glossary page, generated from the construct files; the terms below are the ones that name parts of the wiki itself.
+
+| Term | Meaning | Code |
+|---|---|---|
+| **Construct Atlas** | The design wiki: one page per construct across game-dev-playground and ShmupRouge, each with an interactive toy. Static files; open `docs/wiki/index.html` directly or serve the repo root. | `docs/wiki/` |
+| **Construct** | A mechanism that survives being lifted out of its game: a rule set, loop, material or authoring method with its own knobs. Content (a particular weapon or enemy) is not a construct; the rule it runs on is. One file each. | `docs/wiki/constructs/<id>.js`, `Wiki.construct` |
+| **Family** | The atlas grouping a construct belongs to (weapons, pressure, agents, economy, body, feel, world, structure, generation, tooling). | `families` in `docs/wiki/constructs/manifest.js` |
+| **Toy** | A construct page's small in-browser re-implementation of its rule, with controls starting at the game's defaults. Not the game's code; its caption names what it simplifies. | `toy` field, `docs/wiki/assets/toykit.js` |
+| **Spark** | A recorded idea for reusing or twisting a construct in another game. The workbench draws on them. | `sparks` field |
+| **Workbench** | The atlas page that draws three constructs from different families and asks what game they make together. | `docs/wiki/workbench.html` |
+| **Open threads** | The atlas page that gathers every construct's open questions by family. Generated; edit a question on its construct page. | `docs/wiki/threads.html`, `questions` field |
+| **Atlas check** | Headless check that every manifest entry loads, links resolve and every toy runs ten seconds at each control extreme without throwing. | `node docs/wiki/check.js` |

@@ -4,6 +4,11 @@ A workspace for prototyping game ideas, with a shared framework that every game
 here gets for free: an in-game editor, a performance overlay, debug-draw layers,
 and config profiles.
 
+The [Construct Atlas](docs/wiki/index.html) is the illustrated design wiki: every
+mechanism explored here and in ShmupRouge, one page each, with a playable toy.
+Serve the repo root (`python3 -m http.server`) and visit `/docs/wiki/`; opening
+`docs/wiki/index.html` from disk also works, but browsers then refuse the pixel fonts.
+
 The revised [Modular Weapon System specification](docs/Modular_Weapon_System.md)
 and its [module interaction flow chart (SVG)](docs/diagrams/modular-weapon-system.svg)
 describe the target design. A [playable v2 test build](docs/MWS_Implementation.md)

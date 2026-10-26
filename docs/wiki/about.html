@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About · Construct Atlas</title>
+  <link rel="stylesheet" href="assets/wiki.css">
+  <script src="assets/toykit.js"></script>
+  <script src="assets/wiki.js"></script>
+</head>
+<body>
+  <template id="about">
+    <div class="prose">
+      <div class="kicker">About</div>
+      <h1>How the atlas works</h1>
+      <p class="lede">A construct is a mechanism that would survive being lifted out of its game: a rule set, a loop, a piece of matter, a way of authoring. The atlas collects them from two codebases so they can be understood, played with, and recombined.</p>
+
+      <h2>What counts as a construct</h2>
+      <p>Something with its own rules, its own knobs, and at least one other game it could live in. "The Blaster" is content; <em>aim lead</em> is a construct. "Wave 12" is a number; the <em>wave clock</em> is a construct. Tooling counts too, when it changes how designing feels: a schema-generated editor is a construct for designers rather than players.</p>
+
+      <h2>Reading a page</h2>
+      <ul>
+        <li><b>Status</b> is checked against code, not docs. <span class="chip built"><i></i>Built</span> runs today; <span class="chip partial"><i></i>Partly built</span> runs with gaps the page names; <span class="chip spec"><i></i>Spec only</span> is designed on paper; <span class="chip superseded"><i></i>Superseded</span> was replaced and is kept for its lineage.</li>
+        <li><b>The toy</b> is a small re-implementation of the rule in the browser, not the game's code. Where it simplifies, its caption says so. The numbers in its controls start at the game's defaults.</li>
+        <li><b>Open questions</b> are the parts that are genuinely undecided. <b>Design sparks</b> are ways the construct could be reused or twisted; they are prompts, not plans.</li>
+        <li><b>Where it lives</b> points at the docs and code the page was written from. Playground paths are links; ShmupRouge paths are relative to <code>~/Dev/ShmupRouge/Love2D</code>.</li>
+      </ul>
+
+      <h2>Designing with it</h2>
+      <p><a href="principles.html">Principles</a> collects the decisions made on purpose and the lessons learned the hard way. <a href="threads.html">Open threads</a> gathers every open question from every page, which is the quickest way to pick the next thing to explore.</p>
+      <p>The <a href="workbench.html">workbench</a> draws three constructs from different families and asks what game they make together. Search and the family filters on the <a href="index.html">atlas</a> narrow the field by status or repo, so you can draw only from what is already built.</p>
+
+      <h2>Adding to it</h2>
+      <p>Everything lives in <code>docs/wiki/</code> of game-dev-playground, as static files that open straight from disk or any static host.</p>
+      <ol>
+        <li>Copy <code>constructs/_template.js</code> to <code>constructs/&lt;id&gt;.js</code> and fill it in. The comments in the template list every field.</li>
+        <li>Add the id to <code>constructs/manifest.js</code>, in the family where it belongs. The sidebar, index, search, backlinks and glossary pick it up from there.</li>
+        <li>Link other constructs inline with <code>[[id]]</code>. A link to a construct with no page yet renders greyed out, which is a useful marker for what to write next.</li>
+        <li>Terms go in the construct's <code>terms</code> list; the glossary page is built from them. The repository's own vocabulary stays in <code>docs/glossary.md</code>; a construct term that names playground code should match it.</li>
+        <li>Screenshots of the playground come from its own renderer: <code>luajit tools/screenshot.lua docs/wiki/img/&lt;name&gt;.png --seed 7 ...</code>. Record the command on the page so the shot can be retaken after a change.</li>
+      </ol>
+      <p>Run <code>node docs/wiki/check.js</code> before committing: it loads every construct the way the browser does, checks fields and <code>[[links]]</code>, and runs every toy for ten simulated seconds at each control extreme. It cannot see the drawing, so open the page too.</p>
+      <p>The toy harness is <code>assets/toykit.js</code>. A toy is an object with <code>init</code>, <code>update</code>, <code>draw</code>, optional <code>pointer</code> and <code>readout</code>, and a list of controls; the harness owns the fixed-step loop, the transport buttons, pausing off-screen, and the palette. Draw with the helpers on <code>g</code> (<code>g.circle</code>, <code>g.line</code>, <code>g.tone</code> for dither fills, <code>g.text</code> in the pixel face) and the colours on <code>g.C</code>, so a toy follows the light and dark themes. Wrap a construct file's helpers in a function so its names stay out of the shared page scope. Toy code shared by several pages goes in <code>assets/</code> (the falling-sand core in <code>assets/sand.js</code> serves five pages) and is loaded by <code>construct.html</code>, <code>index.html</code> and <code>check.js</code>.</p>
+
+      <h2>Look and feel</h2>
+      <p>The atlas borrows the playground's UI: one dark ground, three inks (bone, enemy red, pickup green), intermediate tones as a 4×4 ordered dither instead of greys, and the Pixy and Press Start 2P faces from <code>shared/assets/fonts</code>. Prose is set in the system face so long pages stay readable.</p>
+    </div>
+  </template>
+  <script>Wiki.page("about");</script>
+</body>
+</html>

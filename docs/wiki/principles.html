@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Principles · Construct Atlas</title>
+  <link rel="stylesheet" href="assets/wiki.css">
+  <script src="assets/toykit.js"></script>
+  <script src="assets/wiki.js"></script>
+</head>
+<body>
+  <template id="about">
+    <div class="prose">
+      <div class="kicker">Across the explorations</div>
+      <h1>Principles &amp; lessons</h1>
+      <p class="lede">The decisions that were made on purpose, and the things that went wrong in a way worth remembering. These are what a new game built from the atlas should inherit, or consciously break.</p>
+
+      <h2>Design decisions</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Principle</th><th>Why</th><th>Construct</th></tr></thead>
+        <tbody>
+          <tr><td><b>Enemies scale on wave index, never player level.</b></td><td>Scaling to the player's level makes ignoring levelling the optimal play, which fights the core loop. Kept as a dial (<code>scale.playerLevelWeight</code>, default 0). The toy on the escalation page shows where that argument holds and where it does not.</td><td>[[escalation-curve]]</td></tr>
+          <tr><td><b>Choice lives in one place.</b></td><td>Level-ups give an automatic stat bump; every decision the player makes is in the shop. One decision surface, visited about 30 times a run.</td><td>[[lp-levelling]], [[shop-economy]]</td></tr>
+          <tr><td><b>A wave is a block of time, not a batch of enemies.</b></td><td>15 s waves with spawn pulses about every 2.5 s. Nothing but the clock advances a wave, so the wave number is both progress and difficulty.</td><td>[[wave-clock]], [[spawn-pulse]]</td></tr>
+          <tr><td><b>Danger you could not avoid is owed a warning.</b></td><td>Spawns are telegraphed by a closing ring; scrolling enemies follow a fair-attack contract before they shoot.</td><td>[[spawn-telegraph]], [[fair-attack-contract]]</td></tr>
+          <tr><td><b>Composition over special cases.</b></td><td>The MWS retired its Emitter module because sequences reacting to strike events could express everything it did. One grammar, five module classes.</td><td>[[sequences]], [[mws-lineage]]</td></tr>
+          <tr><td><b>Order should mean something.</b></td><td>The same Multi barrel is a heavy volley before a Striker and a cheap split after it. Placing a part is a decision with a visible consequence.</td><td>[[multi-ordering]]</td></tr>
+          <tr><td><b>Never queue the player's intent.</b></td><td>The weapon sees one bit per tick. Unaffordable shots are skipped, not banked, so mashing never builds a backlog and a release is never answered late.</td><td>[[trigger-chain]], [[sequence-reservoir]]</td></tr>
+          <tr><td><b>Matter is the level.</b></td><td>In ShmupRouge, terrain is simulated material that falls, hardens and crumbles, so destruction, mining and line of sight all come from one substrate.</td><td>[[falling-sand]], [[stability-and-debris]]</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2>How we work</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Principle</th><th>Why</th><th>Construct</th></tr></thead>
+        <tbody>
+          <tr><td><b>One list of tunables.</b></td><td>The playground's schema generates the editor, defaults and profiles, so deleting a setting removes it everywhere by construction. ShmupRouge reaches the same place from the other side: Lua defines behaviour, JSON defines values.</td><td>[[schema-editor]], [[json-tunables]]</td></tr>
+          <tr><td><b>Store differences, not snapshots.</b></td><td>Profiles hold only overrides, so a new setting never breaks an old profile.</td><td>[[diff-profiles]]</td></tr>
+          <tr><td><b>The simulation never draws and never reads input.</b></td><td>It takes a movement vector. That is the only reason whole runs can be simulated headless.</td><td>[[headless-sim]], [[balance-harness]]</td></tr>
+          <tr><td><b>Cosmetic randomness gets its own stream.</b></td><td>Retuning a particle must not reshuffle spawns and shop rolls, or two balance runs on one seed stop being comparable.</td><td>[[headless-sim]]</td></tr>
+          <tr><td><b>Build a room to look at one thing.</b></td><td>The zoo, the range and the bench each isolate one kind of content with editable values beside it.</td><td>[[inspection-levels]]</td></tr>
+          <tr><td><b>Look at it.</b></td><td>Every draw bug found so far was found by taking a reproducible screenshot and looking. Tests cannot see a label at the wrong scale.</td><td>[[reproducible-capture]]</td></tr>
+          <tr><td><b>Nothing on the play surface explains itself.</b></td><td>No help text drawn over the game, no image files, everything drawn from primitives in a one-bit-plus-accent palette.</td><td>[[ui-design-language]]</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2>Lessons</h2>
+      <ul>
+        <li><b>Watch the race, not the numbers.</b> Enemy HP once outgrew player damage, so kill rate fell every wave while spawn rate climbed, and the late horde arrived many times faster than it could be cleared. Every scaling knob is a term in one inequality. See [[kill-rate-race]].</li>
+        <li><b>A hard-coded lifetime is a hidden range.</b> Enemy shots with a fixed 5 s lifetime let Spitters snipe from four times their engagement range. The fix made <code>shotLife</code> a tunable; the Orbiter still breaks the same rule. See [[enemy-behaviours]].</li>
+        <li><b>A verdict that holds at one bubble is about the bot.</b> Two pilot bubble sizes gave opposite conclusions about one build. Sweep before trusting. See [[balance-harness]].</li>
+        <li><b>Autosave writes where you are standing.</b> Playtest values autosaved into the default profile, so the game and the balance harness now run different enemy speeds. See [[diff-profiles]].</li>
+        <li><b>Feel can be the missing number.</b> Static Field measures under 4% of damage and also never triggers hit feedback or sound. Some of its weakness may be that nobody can see it working. See [[hit-feedback]].</li>
+        <li><b>The cheapest, always-in-range option wins.</b> The Blaster does about 85% of all damage in every configuration tested. See [[shop-economy]].</li>
+        <li><b>Docs drift both ways.</b> ShmupRouge has built things its docs call future (the black-hole horizon) and documented things nothing reads (zone enemy lists, material hardness). Every atlas page marks status from code for that reason.</li>
+      </ul>
+    </div>
+  </template>
+  <script>Wiki.page("principles");</script>
+</body>
+</html>
