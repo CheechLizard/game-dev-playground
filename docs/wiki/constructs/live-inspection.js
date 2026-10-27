@@ -47,7 +47,6 @@
   Wiki.construct({
     id: "live-inspection",
     name: "Live read-only inspection of the running game",
-    family: "tooling",
     origin: "playground",
     status: "built",
     summary: "The running game serves a read-only MCP endpoint that reports its active config including unsaved edits, its live weapon runtime, and an event trace that links each strike to its hits, its completion and the sounds it asked for.",

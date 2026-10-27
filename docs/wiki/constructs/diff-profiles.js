@@ -33,7 +33,6 @@
   Wiki.construct({
     id: "diff-profiles",
     name: "Profiles that store only what changed",
-    family: "tooling",
     origin: "playground",
     status: "built",
     statusNote: "Built and in daily use. The committed <code>default.json</code> has drifted from schema defaults through autosave, so the game at launch and the balance harness currently run different enemy speeds.",

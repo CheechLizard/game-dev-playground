@@ -39,7 +39,6 @@
   Wiki.construct({
     id: "flow-field-gravity",
     name: "Gravity as a field: attractors, orbits and a perspective dial",
-    family: "world",
     origin: "shmuprouge",
     status: "built",
     statusNote: "Built as one CPU-summed grid of 32-WU cells. The two-layer v2 design (GPU gravity tiles plus a fine atmospheric layer) is spec only, the shockwave repulsor is built but nothing spawns it, and ships and projectiles do not feel the field.",

@@ -27,7 +27,6 @@
   Wiki.construct({
     id: "wake-turbulence",
     name: "Wake turbulence: a vortex street behind every ship",
-    family: "feel",
     origin: "shmuprouge",
     status: "built",
     statusNote: "Built, writing into the 32-WU gravity grid. The finer 8-WU atmospheric layer it was designed for is spec only, and <code>Turbulence.json</code> is read once, so live edits need a restart.",

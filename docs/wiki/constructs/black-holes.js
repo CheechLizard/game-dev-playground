@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "black-holes",
   name: "Black holes: gravity well and event horizon",
-  family: "agents",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Built: the field, the spiral, fading, summing of several holes, deletion of material in the horizon, and destruction of projectiles and enemies. Not built: growth when fed, decay when starved, exotic output on collapse, pull on ships. <code>docs/entities/Black_Holes.md</code> still lists horizon collision and entity destruction as future work; the code has both.",

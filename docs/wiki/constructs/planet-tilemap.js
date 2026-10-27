@@ -33,7 +33,6 @@ function ptmAt(S, x, y) { return [Math.floor((x - PTM_CX) / S.px), Math.floor((y
 Wiki.construct({
   id: "planet-tilemap",
   name: "Planet tile map",
-  family: "generation",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "The editor MVP is built (planet list, radius and core config, slot grid, wedge lines, corner highlights, pen, eraser, rectangle and line tools, stroke undo). Force fields, entities, autotile art and the whole game side are not: <code>shared/data/world/planets/</code> is empty and no Lua reads a planet map.",

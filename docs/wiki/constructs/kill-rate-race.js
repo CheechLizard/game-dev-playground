@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "kill-rate-race",
   name: "Kill-rate race",
-  family: "pressure",
   origin: "playground",
   status: "partial",
   statusNote: "Model documented, not instrumented. The README and editor help describe the race, but nothing in the game or the balance harness reports arrival rate against clear rate per wave.",

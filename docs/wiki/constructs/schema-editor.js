@@ -19,7 +19,6 @@ function addNext(S) {
 Wiki.construct({
   id: "schema-editor",
   name: "One list of settings: the schema-generated editor",
-  family: "tooling",
   origin: "playground",
   status: "built",
   statusNote: "Built and used by every surface. A handful of tuning constants still live in <code>run.lua</code> outside the schema; they are listed under How it works.",

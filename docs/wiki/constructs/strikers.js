@@ -6,7 +6,6 @@
   Wiki.construct({
     id: "strikers",
     name: "Striker shapes",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Ranged, Piercing, Stab, Sweep, Area and Orbit are built in the MWS v2 runtime (F8 bench). The spec's Drone Striker is not. Origin attachment, release and cancellation rules, and beam and field hit counting are still open in the spec.",

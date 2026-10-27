@@ -12,7 +12,6 @@
   Wiki.construct({
     id: "payloads",
     name: "Payload identities",
-    family: "weapons",
     origin: "playground",
     status: "partial",
     statusNote: "Sharp, Impact and Plasma are built in the MWS v2 runtime with shared visual and sound identities. In code Sharp and Impact are mechanically identical; only their presentation differs. Burning, Corrosive, Freezing and Black Hole are spec only, with reserved colours.",

@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "npc-roster",
   name: "NPC roster: goals, roles and symmetry",
-  family: "agents",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only as a framework. Two NPCs exist: the [[kamikaze-dive|Kamikaze]], built as specified, and the Midge, built as a tutorial squadron that does not match its spec. Dive Bomber, Cordon, Flanker, Interceptor and Encircler have no code; nor do miners, burrowers, builders or defence types.",

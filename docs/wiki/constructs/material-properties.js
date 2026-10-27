@@ -57,7 +57,6 @@
   Wiki.construct({
     id: "material-properties",
     name: "Material table: matter as data",
-    family: "world",
     origin: "shmuprouge",
     status: "built",
     statusNote: "Built and driving the sand sim. The <code>hardness</code>, <code>explosive</code> and <code>radioactive</code> fields are loaded but nothing reads them, and the GAS phase has no movement rule.",

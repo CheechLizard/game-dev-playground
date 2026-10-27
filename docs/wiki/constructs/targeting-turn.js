@@ -16,7 +16,6 @@
   Wiki.construct({
     id: "targeting-turn",
     name: "Targeting with turn speed",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Seeking, Weakling and Bossling are built in the MWS v2 runtime (commits <code>d405040</code> and <code>8fe86e1</code>). Every bench preset uses Seeking. Targeting criteria and fallbacks are partly open in the spec, and the 180°/s default is provisional.",

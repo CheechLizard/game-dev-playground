@@ -23,7 +23,6 @@
   Wiki.construct({
     id: "json-tunables",
     name: "JSON tunables with a live bridge editor",
-    family: "tooling",
     origin: "shmuprouge",
     status: "built",
     summary: "\"Lua defines behaviour, JSON defines values\": every tunable is a JSON entry carrying its own range and label, a React editor generates sliders from them, and a bridge pushes each change into the running game, which applies it only if the code reads the value at use time.",

@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "escaped-boss",
   name: "Escaped boss: retreat that follows you home",
-  family: "structure",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (Portal_Stitching.md Escaped Boss, Solar_System_Arena.md Corridor Abort and open question 8). There are no bosses, corridors or portals in code; escape probability and the escaped boss's behaviour are TBD.",

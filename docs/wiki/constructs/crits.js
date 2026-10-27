@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "crits",
   name: "Critical hits",
-  family: "body",
   origin: "playground",
   status: "built",
   summary: "Each damage event rolls the weapon's (or payload's) crit chance plus the player's bonus; a crit multiplies that hit by 2, so expected damage is 1 + p(m − 1) times base.",

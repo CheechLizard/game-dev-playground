@@ -38,7 +38,6 @@ function zedHit(S, x, y) {
 Wiki.construct({
   id: "zone-editor",
   name: "Zone editor",
-  family: "generation",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only. The React editor app exists, with planet, graph and material views, but has no zone view. The spec's export format is also older than the template-and-layers JSON the game now loads.",

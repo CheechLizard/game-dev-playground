@@ -80,7 +80,6 @@
   Wiki.construct({
     id: "stability-and-debris",
     name: "Settle, harden, crumble: terrain with a memory",
-    family: "world",
     origin: "shmuprouge",
     status: "built",
     statusNote: "The whole cycle is built. The falloff-based crumble (<code>damageRadius</code>) and ring damage exist only as unused code and spec; every live blast clears its full radius.",

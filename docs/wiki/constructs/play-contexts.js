@@ -20,7 +20,6 @@ function plcKill(S, kit) {
 Wiki.construct({
   id: "play-contexts",
   name: "Play contexts and game contexts",
-  family: "structure",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "The Context Router and its Gameplay / Cinematic / GameOver / Edit contexts are built and in use. Play Context is half-wired: movement reads its heading every frame, but nothing calls <code>PlayContext.set</code>, and no level JSON names a preset, so the ship is always in FreeRoam.",

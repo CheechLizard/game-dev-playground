@@ -31,7 +31,6 @@ function wgsBlast(S, cx, cy) {
 Wiki.construct({
   id: "world-gen-stack",
   name: "World generation stack (L1-L6)",
-  family: "generation",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "L1 sand physics, L2 stability and L5 zones are built; L4 is built as JSON ring recipes rather than the WFC the doc names; L3 is a single-size 47-blob autotile rather than the doc's 13 tiles &times; 4 crack levels; L6 stages is conceptual.",

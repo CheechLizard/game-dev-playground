@@ -11,7 +11,6 @@
   Wiki.construct({
     id: "sequences",
     name: "Sequences and strike events",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Built in the MWS v2 runtime, playable through the <em>Piercing + Miss</em> and <em>Complete + Field</em> bench presets. How several events in one tick should be encoded is an open spec decision; the code's provisional answer is one execution context per event. Multi-input joins and cycles are not supported.",

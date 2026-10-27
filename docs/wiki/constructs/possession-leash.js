@@ -8,7 +8,6 @@ function pslInit(S) {
 Wiki.construct({
   id: "possession-leash",
   name: "Possession leash",
-  family: "structure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built as the tutorial's possession cinematic. The tutorial doc says the player only watches; the code keeps the ship under control and makes the death a distance leash.",

@@ -31,8 +31,16 @@ vm.runInContext(fs.readFileSync(path.join(DIR, "constructs/manifest.js"), "utf8"
 let failures = 0;
 const fail = (id, msg) => { failures++; console.log("  FAIL " + id + ": " + msg); };
 
-const ids = registry.manifest.constructs;
-const famIds = new Set(registry.manifest.families.map((f) => f.id));
+const systems = registry.manifest.systems;
+const ids = [];
+for (const sy of systems) {
+  if (!sy.id || !sy.name || !sy.color || !sy.overview || !(sy.groups || []).length) fail(sy.id || "?", "system needs id, name, color, overview and groups");
+  for (const g of sy.groups || []) for (const id of g.constructs) {
+    if (ids.includes(id)) fail(id, "listed twice in the manifest");
+    ids.push(id);
+  }
+}
+const systemIds = new Set(systems.map((sy) => sy.id));
 for (const id of ids) {
   const file = path.join(DIR, "constructs", id + ".js");
   if (!fs.existsSync(file)) { fail(id, "listed in manifest but no file"); continue; }
@@ -89,16 +97,16 @@ function runToy(c, P) {
   for (const [key, v] of Object.entries(S)) if (typeof v === "number" && !Number.isFinite(v)) throw new Error("state " + key + " is " + v);
 }
 
-const linkRe = /\[\[([a-z0-9-]+)/g;
+const linkRe = /\[\[(@?[a-z0-9-]+)/g;
 for (const id of ids) {
   const c = registry.byId[id];
   if (!c || (only.length && !only.includes(id))) continue;
-  for (const f of ["name", "family", "origin", "status", "summary", "intent", "how"]) if (!c[f]) fail(id, "missing " + f);
-  if (c.family && !famIds.has(c.family)) fail(id, "unknown family " + c.family);
+  for (const f of ["name", "origin", "status", "summary", "intent", "how"]) if (!c[f]) fail(id, "missing " + f);
+  if (c.family) fail(id, "has a family field; placement belongs in manifest.js");
   if (!["built", "partial", "spec", "superseded"].includes(c.status)) fail(id, "bad status " + c.status);
   if (!["playground", "shmuprouge", "both"].includes(c.origin)) fail(id, "bad origin " + c.origin);
   const text = JSON.stringify(c);
-  for (const m of text.matchAll(linkRe)) if (!registry.byId[m[1]] && !ids.includes(m[1])) console.log("  note " + id + ": links to [[" + m[1] + "]], which has no page yet");
+  for (const m of text.matchAll(linkRe)) if (m[1][0] === "@" ? !systemIds.has(m[1].slice(1)) : (!registry.byId[m[1]] && !ids.includes(m[1]))) console.log("  note " + id + ": links to [[" + m[1] + "]], which has no page yet");
   for (const r of c.related || []) { const rid = typeof r === "string" ? r : r.id; if (!ids.includes(rid)) console.log("  note " + id + ": related " + rid + " has no page yet"); }
   for (const s of c.shots || []) if (!fs.existsSync(path.join(DIR, s.src))) fail(id, "missing screenshot " + s.src);
   if (!c.toy) continue;
@@ -116,5 +124,24 @@ for (const id of ids) {
     catch (e) { fail(id, "toy throws with " + JSON.stringify(P) + ": " + (e.stack || e).toString().split("\n").slice(0, 3).join(" | ")); break; }
   }
 }
-console.log((failures ? failures + " failure(s)" : "ok") + " — " + ids.length + " constructs");
+// System overviews link too.
+for (const sy of systems) for (const m of JSON.stringify(sy).matchAll(linkRe)) {
+  if (m[1][0] === "@" ? !systemIds.has(m[1].slice(1)) : !ids.includes(m[1])) fail(sy.id, "overview links to unknown [[" + m[1] + "]]");
+}
+
+// Notes: every folder must name a construct, a system, or _atlas.
+const notesDir = path.join(DIR, "notes");
+let noteCount = 0;
+if (fs.existsSync(notesDir)) for (const d of fs.readdirSync(notesDir, { withFileTypes: true })) {
+  if (!d.isDirectory()) continue;
+  if (d.name !== "_atlas" && !ids.includes(d.name) && !systemIds.has(d.name)) fail(d.name, "notes folder for an unknown construct or system");
+  for (const f of fs.readdirSync(path.join(notesDir, d.name))) {
+    if (!/^\d{8}-\d{6}-[a-z0-9-]*\.md$/.test(f)) { fail(d.name, "unexpected file in notes: " + f); continue; }
+    const t = fs.readFileSync(path.join(notesDir, d.name, f), "utf8");
+    if (!/^---\n[\s\S]*?kind: (note|bug)[\s\S]*?status: (open|resolved)[\s\S]*?\n---\n/.test(t)) fail(d.name, f + " has no valid front matter");
+    noteCount++;
+  }
+}
+
+console.log((failures ? failures + " failure(s)" : "ok") + " — " + ids.length + " constructs in " + systems.length + " systems, " + noteCount + " notes");
 process.exit(failures ? 1 : 0);

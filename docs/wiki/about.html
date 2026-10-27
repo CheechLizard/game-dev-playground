@@ -6,6 +6,7 @@
   <title>About · Construct Atlas</title>
   <link rel="stylesheet" href="assets/wiki.css">
   <script src="assets/toykit.js"></script>
+  <script src="assets/notes.js"></script>
   <script src="assets/wiki.js"></script>
 </head>
 <body>
@@ -18,6 +19,16 @@
       <h2>What counts as a construct</h2>
       <p>Something with its own rules, its own knobs, and at least one other game it could live in. "The Blaster" is content; <em>aim lead</em> is a construct. "Wave 12" is a number; the <em>wave clock</em> is a construct. Tooling counts too, when it changes how designing feels: a schema-generated editor is a construct for designers rather than players.</p>
 
+      <h2>How it is organised</h2>
+      <p>The atlas follows the convention most studio design wikis use: it is organised by <b>game system</b>, in roughly the order a player meets them, from controls and combat through enemies, difficulty, progression and structure to levels, simulation, feedback and tools. Each system has an overview page saying what the system is, how its parts feed each other, and where to start reading. Under it, constructs sit in small named groups, and every construct page uses the same template. Cross-links, backlinks, the glossary and the open-threads page tie the systems together.</p>
+      <p>A construct belongs to one system even when it touches several (a weapon's feedback is in Feedback, not Combat). Its "Composes with" links are how it reaches the others.</p>
+
+      <h2>Notes and bugs</h2>
+      <p>Select any text on a construct or system page and a <b>+ note</b> / <b>+ bug</b> button appears; the note quotes the selection and records the heading it sat under. Each page also has a <b>Notes &amp; bugs</b> section at the bottom, and <a href="notes.html">Notes &amp; bugs</a> lists everything, filterable by kind, status and whether a bug is in the game or in the wiki.</p>
+      <p>Notes are saved by the atlas server as one Markdown file each in <code>docs/wiki/notes/&lt;construct&gt;/</code>, so they are committed with the repository and readable by anyone (and any agent) working in it. Start the server from the repository root:</p>
+      <pre><code>python3 docs/wiki/server.py</code></pre>
+      <p>and open <code>http://localhost:8765/docs/wiki/</code>. Without it the atlas still reads, but notes cannot be written. The file format is in <code>docs/wiki/notes/README.md</code>.</p>
+
       <h2>Reading a page</h2>
       <ul>
         <li><b>Status</b> is checked against code, not docs. <span class="chip built"><i></i>Built</span> runs today; <span class="chip partial"><i></i>Partly built</span> runs with gaps the page names; <span class="chip spec"><i></i>Spec only</span> is designed on paper; <span class="chip superseded"><i></i>Superseded</span> was replaced and is kept for its lineage.</li>
@@ -28,13 +39,13 @@
 
       <h2>Designing with it</h2>
       <p><a href="principles.html">Principles</a> collects the decisions made on purpose and the lessons learned the hard way. <a href="threads.html">Open threads</a> gathers every open question from every page, which is the quickest way to pick the next thing to explore.</p>
-      <p>The <a href="workbench.html">workbench</a> draws three constructs from different families and asks what game they make together. Search and the family filters on the <a href="index.html">atlas</a> narrow the field by status or repo, so you can draw only from what is already built.</p>
+      <p>The <a href="workbench.html">workbench</a> draws three constructs from different systems and asks what game they make together. Search and the filters on the <a href="index.html">atlas</a> narrow the field by status or repo, so you can draw only from what is already built.</p>
 
       <h2>Adding to it</h2>
       <p>Everything lives in <code>docs/wiki/</code> of game-dev-playground, as static files that open straight from disk or any static host.</p>
       <ol>
         <li>Copy <code>constructs/_template.js</code> to <code>constructs/&lt;id&gt;.js</code> and fill it in. The comments in the template list every field.</li>
-        <li>Add the id to <code>constructs/manifest.js</code>, in the family where it belongs. The sidebar, index, search, backlinks and glossary pick it up from there.</li>
+        <li>Add the id to <code>constructs/manifest.js</code>, under the system and group where it belongs. The manifest is the only record of placement; the sidebar, index, system pages, search, backlinks and glossary pick it up from there. A new group is a new <code>{ name, constructs }</code> entry; a new system needs an <code>overview</code> and a <code>loop</code>.</li>
         <li>Link other constructs inline with <code>[[id]]</code>. A link to a construct with no page yet renders greyed out, which is a useful marker for what to write next.</li>
         <li>Terms go in the construct's <code>terms</code> list; the glossary page is built from them. The repository's own vocabulary stays in <code>docs/glossary.md</code>; a construct term that names playground code should match it.</li>
         <li>Screenshots of the playground come from its own renderer: <code>luajit tools/screenshot.lua docs/wiki/img/&lt;name&gt;.png --seed 7 ...</code>. Record the command on the page so the shot can be retaken after a change.</li>

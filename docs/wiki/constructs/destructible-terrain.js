@@ -53,7 +53,6 @@
   Wiki.construct({
     id: "destructible-terrain",
     name: "Destructible terrain: quads, cracks and collisions",
-    family: "world",
     origin: "shmuprouge",
     status: "partial",
     statusNote: "The quad hierarchy (v0.5), ship bounce and impact damage, and painted tile zones are built. The material health and crack layer, impact cracks, and debris that remembers its tile art are spec only.",

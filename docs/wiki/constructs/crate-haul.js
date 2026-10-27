@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "crate-haul",
   name: "Crate haul: loot you have to tow home",
-  family: "economy",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only, in Game_Overview.md. No crate code exists (every 'crate' match in the code is a terrain crater), and the Solar System docs' version of the loop does not mention crates.",

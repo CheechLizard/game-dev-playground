@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "combat-pressure",
   name: "Combat pressure: multipliers and density zones",
-  family: "pressure",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (<code>docs/design/Combat_Pressure.md</code>). No multiplier code exists. The two built spawners, [[formation-waves]] and [[encounter-spawner]], each have a cap but no time, progress or zone scaling.",

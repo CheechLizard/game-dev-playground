@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "spawn-pulse",
   name: "Spawn pulses",
-  family: "pressure",
   origin: "playground",
   status: "built",
   statusNote: "Built. Finding from reading the code (not measured): spawns land on screen near arena walls, and the balance pilot is steered away from walls, so harness runs under-represent it.",

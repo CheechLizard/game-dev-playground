@@ -24,7 +24,6 @@
   Wiki.construct({
     id: "ui-design-language",
     name: "One bit plus an accent: the UI design language",
-    family: "tooling",
     origin: "playground",
     status: "built",
     statusNote: "Built for the editor, placards and the bench. The HUD, shop and zoo status bar still use the game palette and alpha greys rather than the UI theme.",

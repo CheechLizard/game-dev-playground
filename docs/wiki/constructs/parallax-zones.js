@@ -20,7 +20,6 @@ function plxOriginX(z, d, cam, mode) {
 Wiki.construct({
   id: "parallax-zones",
   name: "Parallax zones",
-  family: "generation",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Background layers (depth below 1) are built and drawn from zone templates. Overlays (depth above 1) are spec only: the code would accept one, but draws every parallax zone in one pass before the terrain, so it would land behind the gameplay layer.",

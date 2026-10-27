@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "store-gambling",
   name: "Store with gambling and a pity timer",
-  family: "economy",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only. Solar_System_Arena.md defines the store, gambling and anti-frustration rules without numbers; Levels_Overview.md gives a fixed-UI milestone store. No store, credits or gambling code exists (the alpha arena's zone data names a merchant NPC that nothing reads).",

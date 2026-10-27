@@ -26,7 +26,6 @@
   Wiki.construct({
     id: "mws-graph",
     name: "Modular weapon graph",
-    family: "weapons",
     origin: "playground",
     status: "partial",
     statusNote: "The v2 graph and runtime are built and playable only in the F8 bench, through eight prototype weapons. The survival game and its shop weapons still run the legacy graph model ([[mws-lineage]]). Multi-input joins, cycles, several subclasses and the Drone Striker are spec only.",

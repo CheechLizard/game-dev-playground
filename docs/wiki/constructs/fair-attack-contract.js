@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "fair-attack-contract",
   name: "The fair attack contract",
-  family: "agents",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built in the Kamikaze, and written down as rules for every scrolling NPC in <code>NPC_OpenSpace_Specification_v0_3.md</code> &sect;4.3&ndash;4.7. No other scrolling NPC exists yet to test them on.",

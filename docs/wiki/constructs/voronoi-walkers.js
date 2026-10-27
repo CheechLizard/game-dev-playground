@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "voronoi-walkers",
   name: "Voronoi walkers: the spider mech",
-  family: "agents",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Built: the nav graph, BFS pursuit, idle wandering, occupancy, and the six-legged tripod gait on asteroid vertices. Spec only (<code>docs/plans/Mesh_Surgery_and_Spider_Kill_Mechanics.md</code>): mesh surgery when an asteroid dies, and the kill puzzle where the shield drops once all six feet are gone. Today the mesh is static, so feet keep standing on rock that has been blasted away.",

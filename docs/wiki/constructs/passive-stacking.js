@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "passive-stacking",
   name: "Passives with stacking prices and caps",
-  family: "economy",
   origin: "playground",
   status: "built",
   summary: "Eight repeatable stat boosts sold in the shop; each stack costs a linear step more than the last, each passive has a stack cap, and every purchase is one addition into the player's bonus table.",

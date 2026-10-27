@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "harvest-bar",
   name: "Harvest bar: colour-sorted stripes and purity clears",
-  family: "economy",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Built: the ship-bound harvester and a bar that inserts every harvested cell's colour in hue order, so it draws as stripes. Spec only: purity detection, threshold clears, multipliers, filtration tiers and upgradeable capacity.",

@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "player-movement",
   name: "Accel/friction body",
-  family: "body",
   origin: "playground",
   status: "built",
   summary: "Input accelerates the player at 1400 px/s², letting go decelerates at a constant 1200 px/s², and speed is clamped to 82 px/s: top speed in 0.06 s, stopped in 2.8 px.",

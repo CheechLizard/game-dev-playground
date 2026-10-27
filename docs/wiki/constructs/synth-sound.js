@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "synth-sound",
   name: "Synthesised, coalesced sound",
-  family: "feel",
   origin: "playground",
   status: "built",
   statusNote: "Built; captures and headless runs are silent by design. An earlier filter that suppressed launch audio for strikes exhausted before playback has been removed with the old energy model.",

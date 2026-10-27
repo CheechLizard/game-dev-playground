@@ -11,7 +11,6 @@
   Wiki.construct({
     id: "sustained-drain",
     name: "Sustained drain and sputter",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Built in the MWS v2 runtime (commits <code>3709383</code> and <code>55260f5</code>) and playable through the <em>Beam exhaustion</em> bench preset. Hit counting for beams and fields, and Striker concurrency and release rules, are still open in the spec; the code's choices are described below.",

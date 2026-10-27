@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "wave-clock",
   name: "Wave clock",
-  family: "pressure",
   origin: "playground",
   status: "built",
   statusNote: "Built in horde-survivor. One inferred edge case: the 60th wave ends on the same frame the run is won, which looks like it opens a 30th shop that can never be used (read from code order, not seen in play).",

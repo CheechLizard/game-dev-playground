@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "effect-prescriptions",
   name: "Effect profiles and customer prescriptions",
-  family: "economy",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (docs/world/Materials.md Parts 3, 8 and 9). The 64-material grid with effect vectors is written out in the doc, but no effectProfile exists in code or in the 22 material JSONs, and the doc's materials are not the ones the game uses.",

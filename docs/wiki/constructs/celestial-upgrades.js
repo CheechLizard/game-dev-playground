@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "celestial-upgrades",
   name: "Celestial upgrades: boss fragments that transform a tool",
-  family: "economy",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (docs/design/Celestial_Upgrades.md, Solar_System_Arena.md Win Condition). No fragments, bosses, tool tiers or Sol exist in code; the 8th upgrade and the boss-direction pairing are undecided.",

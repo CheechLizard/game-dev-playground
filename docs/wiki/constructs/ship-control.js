@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "ship-control",
   name: "Ship control: scroll box, direct and thrust",
-  family: "body",
   origin: "shmuprouge",
   status: "built",
   statusNote: "All three modes are built. The default, <code>controlScheme = \"arcade\"</code>, is undocumented: <code>docs/systems/Control.md</code> and <code>PlayContext.md</code> describe only direct and thrust, and Control.md's <code>controlScheme: thrust</code>, <code>friction 400</code> and file paths are stale.",

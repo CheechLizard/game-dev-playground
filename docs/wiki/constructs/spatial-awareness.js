@@ -16,7 +16,6 @@
   Wiki.construct({
     id: "spatial-awareness",
     name: "Spatial awareness: who can see whom",
-    family: "agents",
     origin: "shmuprouge",
     status: "partial",
     statusNote: "Built: 64 visibility rays from the player each frame and turrets that wake only when seen. Spec only: the overlapping-cell spatial grid, front/rear analytics, tiered updates, arc queries and NPC-to-NPC awareness.",

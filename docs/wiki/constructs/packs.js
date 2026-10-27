@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "packs",
   name: "Packs",
-  family: "pressure",
   origin: "playground",
   status: "built",
   summary: "One weighted pick spawns a whole pack of that type, jittered around a single point, so a group arrives together instead of trickling in from opposite edges.",

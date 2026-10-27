@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "encounter-spawner",
   name: "Mode-gated encounter spawner",
-  family: "pressure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built. Only one type is registered: the [[kamikaze-dive|Kamikaze]], gated on scrolling. The stopped-mode types in the [[npc-roster|roster]] (Cordon, Encircler) are spec only.",

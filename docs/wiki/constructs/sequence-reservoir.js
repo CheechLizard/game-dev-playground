@@ -13,7 +13,6 @@
   Wiki.construct({
     id: "sequence-reservoir",
     name: "Sequence reservoir and shot payment",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Reservoirs, tiers, atomic admission and shot payment are built in the MWS v2 runtime (F8 bench). Only one Battery subclass exists in code, <code>infinite</code>, and it behaves as an ordinary finite reservoir. Instant, Ammo, Constant and Timer batteries, and what Infinite should really mean, are spec only. Initial charge and tier numbers are provisional.",

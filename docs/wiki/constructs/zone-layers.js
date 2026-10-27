@@ -54,7 +54,6 @@ function znlChord(fill) {
 Wiki.construct({
   id: "zone-layers",
   name: "Zones, biomes, features",
-  family: "generation",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built, in a newer shape than the docs: levels place zone templates made of depth layers, where the docs put shape and biome inline on the level. Shapes are circle and ring only. Zone <code>params.enemies</code> (and the level's <code>npcs</code>, <code>storyTrigger</code>) are read by nothing.",

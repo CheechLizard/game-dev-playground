@@ -12,7 +12,6 @@
   Wiki.construct({
     id: "mws-lineage",
     name: "MWS lineage: from Emitter to sequences",
-    family: "weapons",
     origin: "both",
     status: "superseded",
     statusNote: "Two models here are history and one is still running. The legacy graph runtime is what the survival game and its shop weapons use today; only the F8 bench's eight prototypes run v2. The Emitter is gone from v2, and the first v2 energy model was deleted in commit <code>55260f5</code>.",

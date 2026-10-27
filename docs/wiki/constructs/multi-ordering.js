@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "multi-ordering",
   name: "Volley or split: Multi ordering",
-  family: "weapons",
   origin: "playground",
   status: "built",
   statusNote: "Built in the MWS v2 runtime and playable in the F8 bench through the <em>Full volley</em> and <em>Split strike</em> presets. The survival game's weapons still use the legacy model.",

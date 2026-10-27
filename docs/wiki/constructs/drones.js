@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "drones",
   name: "Drones: the summon cycle",
-  family: "agents",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (<code>docs/entities/Drone_Systems.md</code>). No drone code exists; the only built helper is the ship-bound harvester behind the [[harvest-bar]]. The spec names parameters but gives no numbers.",

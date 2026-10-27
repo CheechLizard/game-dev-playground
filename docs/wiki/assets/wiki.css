@@ -286,3 +286,79 @@ figure.shot figcaption code { font-size: 12px; }
 .thread h3 a { color: var(--ink); }
 .thread .chip { font-size: 12px; padding: 3px 6px 4px; }
 @media (max-width: 600px) { .toy-readout { font-size: 11px; left: 6px; top: 4px; } }
+
+/* ------------------------------------------------------- systems & groups */
+
+.nav-fams > h4 { margin: calc(var(--u) * 6) 0 8px; font: 16px/1 var(--font-pixel); color: var(--ink-3); }
+.nav-fam { margin-top: 2px; }
+.nav-sys {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; margin: 0 -8px; border-radius: 2px;
+  color: var(--ink-2); text-decoration: none; font: 16px/1.2 var(--font-pixel);
+}
+.nav-sys i { width: 8px; height: 8px; flex: none; }
+.nav-sys span { flex: 1; }
+.nav-sys small { color: var(--ink-3); font: 13px var(--font-pixel); }
+.nav-sys:hover { color: var(--ink); background-image: var(--tone-inert); }
+.nav-fam.open .nav-sys { color: var(--ink); }
+.nav-sys.on { background: var(--ink); color: var(--bg) !important; }
+.nav-sys.on small { color: var(--bg); }
+.nav-fam.open { padding-bottom: 10px; }
+.nav-fam h5 { margin: 10px 0 2px 16px; font: 13px/1.2 var(--font-pixel); color: var(--ink-3); text-transform: none; }
+.nav-fam.open ul { margin-left: 16px; }
+.kicker > span { color: var(--ink-3); }
+
+.sys-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 28px; }
+.sys-tile {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid var(--rule); border-left: 4px solid var(--fam);
+  border-radius: 2px; text-decoration: none; color: var(--ink); background: var(--panel);
+}
+.sys-tile:hover { background-image: var(--tone-inert); color: var(--ink); }
+.sys-tile b { font: 17px/1.2 var(--font-pixel); }
+.sys-tile span { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.sys-tile small { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+.fam-head h2 a { color: inherit; text-decoration: none; }
+.fam-head h2 a:hover { text-decoration: underline; }
+h3.grp { font: 16px/1.2 var(--font-pixel); color: var(--ink-2); margin: 26px 0 0; }
+.loop { margin: 28px 0 8px; padding: 14px 16px; border: 1px solid var(--rule); border-left: 4px solid var(--fam); background-image: var(--tone-inert); max-width: 720px; }
+.loop b { display: block; font: 15px/1.2 var(--font-pixel); color: var(--ink-3); margin-bottom: 6px; font-weight: normal; }
+
+/* ---------------------------------------------------------- notes & bugs */
+
+.chip.bug { color: var(--enemy); }
+.chip.notekind { color: var(--sky); }
+.nt-help { font-size: 14px; }
+.nt-list { display: grid; gap: 10px; margin: 16px 0; }
+.nt { border: 1px solid var(--rule); border-radius: 2px; padding: 12px 14px; position: relative; background: var(--panel); }
+.nt[data-kind="bug"] { border-left: 3px solid var(--enemy); }
+.nt[data-kind="note"] { border-left: 3px solid var(--sky); }
+.nt.done { opacity: 0.6; }
+.nt header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-right: 80px; }
+.nt header b { font-size: 15px; }
+.nt .chip { font-size: 12px; padding: 3px 6px 4px; }
+.nt-meta { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+.nt-meta code { font-size: 11px; }
+.nt blockquote { margin: 10px 0 0; padding: 6px 10px; border-left: 2px solid var(--ink-3); color: var(--ink-2); font-size: 14px; background-image: var(--tone-inert); }
+.nt p { margin: 10px 0 0; font-size: 14px; }
+.nt-toggle { position: absolute; top: 10px; right: 10px; font-size: 13px; padding: 4px 8px 5px; }
+
+.sel-tip { position: absolute; z-index: 20; display: flex; gap: 2px; background: var(--ink); padding: 2px; border-radius: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+.sel-tip button { background: var(--ink); color: var(--bg); border: 0; font: 14px/1 var(--font-pixel); padding: 6px 9px 7px; cursor: pointer; border-radius: 2px; }
+.sel-tip button:hover { background: var(--bg); color: var(--ink); }
+
+dialog.composer { width: min(560px, calc(100vw - 32px)); border: 1px solid var(--ink-3); border-radius: 3px; background: var(--panel); color: var(--ink); padding: 18px; }
+dialog.composer::backdrop { background: rgba(0, 0, 0, 0.55); }
+.cmp-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.cmp-head b { font: 18px/1.2 var(--font-pixel); }
+.cmp-target { font-size: 13px; color: var(--ink-3); }
+.cmp-kinds { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 14px; margin-bottom: 12px; }
+.cmp-kinds label { display: inline-flex; gap: 5px; align-items: center; }
+.cmp-about { display: inline-flex; gap: 10px; color: var(--ink-2); }
+.cmp-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.cmp-field span { font: 14px var(--font-pixel); color: var(--ink-3); }
+.cmp-field input, .cmp-field textarea {
+  background: var(--bg); color: var(--ink); border: 1px solid var(--rule); border-radius: 2px; padding: 8px; font: 14px/1.45 var(--font-body); resize: vertical;
+}
+.cmp-field input:focus, .cmp-field textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.cmp-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cmp-where { font-size: 12px; color: var(--ink-3); margin-right: auto; }
+.cmp-err { font-size: 13px; color: var(--enemy); }

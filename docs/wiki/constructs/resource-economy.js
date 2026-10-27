@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "resource-economy",
   name: "The matter loop: destruction feeds construction",
-  family: "economy",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "The tutorial's single loop is built: shoot rock into loose particles, vacuum them with the ship-bound harvester into a 2500-cell bar, deliver it to the artifact to start the gate. Alien harvesters, the race, factory structures and multiple resource types are spec only. Which economy wraps this loop (crates and a store, or a portal-activating bar plus fuel) is undecided in the docs.",

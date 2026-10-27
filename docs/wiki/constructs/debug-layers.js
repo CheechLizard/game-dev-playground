@@ -24,7 +24,6 @@
   Wiki.construct({
     id: "debug-layers",
     name: "Debug layers as ordinary settings",
-    family: "tooling",
     origin: "playground",
     status: "built",
     statusNote: "Built, ten layers in the survival game. Two open faults: enemy-state labels draw about 3&times; too large, and <code>--set overlay.&lt;id&gt;=true</code> in a capture draws nothing.",

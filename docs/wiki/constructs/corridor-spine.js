@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "corridor-spine",
   name: "Corridor spine and branches",
-  family: "structure",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (Levels_Overview.md Corridor and Procedural Generation). No segment library, generator or corridor stage exists; CorridorBounds, the camera bounds a corridor would use, is defined but never created.",

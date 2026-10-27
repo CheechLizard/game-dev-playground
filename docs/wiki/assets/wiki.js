@@ -1,13 +1,15 @@
 /* Construct Atlas — registry, loader and page renderers.
  *
  * Every construct is one file in constructs/, which calls Wiki.construct({...}).
- * constructs/manifest.js lists the families and the construct ids in reading
- * order. Nothing else holds construct data: the index, the sidebar, search,
- * backlinks and the glossary are all derived from those files, so adding a
- * construct is adding one file and one line in the manifest.
+ * constructs/manifest.js is the table of contents: game systems, each split
+ * into groups of construct ids. Nothing else holds construct data or placement:
+ * the index, system pages, sidebar, search, backlinks and the glossary are all
+ * derived from those files, so adding a construct is adding one file and one id
+ * in the manifest. (Inside the renderer a construct's system is `c.family`.)
  *
  * Pages are plain HTML that load this script and call one renderer:
- *   Wiki.page("index" | "construct" | "glossary" | "workbench" | "about")
+ *   Wiki.page("index" | "system" | "construct" | "glossary" | "workbench" |
+ *             "threads" | "notes" | "about" | "principles")
  * Scripts are loaded with <script> tags rather than fetch, so the wiki works
  * straight from the filesystem as well as from any static host.
  */
@@ -20,15 +22,24 @@
   })();
 
   const W = {
+    systems: [],
     families: [],
     order: [],
+    place: {},
     byId: {},
     list: [],
   };
 
   // ------------------------------------------------------------ registry
 
-  W.manifest = function (m) { W.families = m.families; W.order = m.constructs; };
+  W.manifest = function (m) {
+    W.systems = W.families = m.systems;
+    W.order = []; W.place = {};
+    for (const s of m.systems) for (const g of s.groups) for (const id of g.constructs) {
+      W.order.push(id);
+      W.place[id] = { system: s.id, group: g.name };
+    }
+  };
   W.construct = function (c) {
     if (!c.id) throw new Error("construct without id");
     W.byId[c.id] = c;
@@ -48,6 +59,7 @@
     await loadScript(BASE + "constructs/manifest.js");
     await Promise.all(W.order.map((id) => loadScript(BASE + "constructs/" + id + ".js")));
     W.list = W.order.map((id) => W.byId[id]).filter(Boolean);
+    for (const c of W.list) { c.family = W.place[c.id].system; c.group = W.place[c.id].group; }
     const missing = W.order.filter((id) => !W.byId[id]);
     if (missing.length) console.warn("manifest names constructs with no file:", missing);
     buildBacklinks();
@@ -57,20 +69,25 @@
 
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const href = (id) => "construct.html?c=" + encodeURIComponent(id);
-  W.href = href;
+  const sysHref = (id) => "system.html?s=" + encodeURIComponent(id);
+  W.href = href; W.sysHref = sysHref; W.esc = esc;
 
-  // [[id]] and [[id|label]] become links to that construct.
+  // [[id]] and [[id|label]] become links to that construct; [[@system|label]] to a system page.
   function links(html) {
-    return String(html || "").replace(/\[\[([a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, label) => {
+    return String(html || "").replace(/\[\[(@?[a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, label) => {
+      if (id[0] === "@") {
+        const sy = W.family(id.slice(1));
+        return '<a href="' + sysHref(sy.id) + '">' + (label || esc(sy.name)) + "</a>";
+      }
       const c = W.byId[id];
       if (!c) return '<span class="muted" title="no page yet">' + esc(label || id) + "</span>";
       return '<a href="' + href(id) + '" title="' + esc(c.summary) + '">' + (label || esc(c.name)) + "</a>";
     });
   }
-  W.links = links;
+  W.links = links; W.plain = plain;
   // Authored HTML reduced to inline text (no nested links), for cards and link tiles.
   function plain(html) {
-    return String(html || "").replace(/\[\[([a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, label) => label || (W.byId[id] ? W.byId[id].name : id))
+    return String(html || "").replace(/\[\[(@?[a-z0-9-]+)(?:\|([^\]]+))?\]\]/g, (m, id, label) => label || (W.byId[id] ? W.byId[id].name : W.family(id.slice(1)).name))
       .replace(/<\/?a\b[^>]*>/g, "");
   }
 
@@ -87,7 +104,6 @@
     return '<span class="chip ' + s[0] + '"><i></i>' + esc(s[1]) + "</span>";
   }
   function originChip(c) { return '<span class="chip origin">' + esc(ORIGIN[c.origin] || c.origin) + "</span>"; }
-  function famColor(fid) { return "var(" + W.family(fid).color + ")"; }
 
   function sourceLink(src) {
     // "playground:path" links into this repo; "shmuprouge:path" names the sibling repo.
@@ -167,15 +183,21 @@
 
   // --------------------------------------------------------------- shell
 
-  function shell(activeId, activeTop) {
-    const fams = W.families.map((f) => {
-      const items = W.list.filter((c) => c.family === f.id);
-      if (!items.length) return "";
-      return '<div class="nav-fam"><h4><i style="background:var(' + f.color + ')"></i>' + esc(f.name) + "</h4><ul>" +
-        items.map((c) => '<li><a href="' + href(c.id) + '"' + (c.id === activeId ? ' class="on"' : "") + ">" + esc(c.name) +
-          (c.status === "spec" ? "<small>spec</small>" : "") + "</a></li>").join("") + "</ul></div>";
+  // Sidebar: every system, with the current one opened out into its groups.
+  function shell(activeId, activeTop, activeSystem) {
+    const openSys = activeId && W.byId[activeId] ? W.byId[activeId].family : activeSystem;
+    const fams = W.systems.map((sy) => {
+      const n = W.list.filter((c) => c.family === sy.id).length;
+      if (!n) return "";
+      const open = sy.id === openSys;
+      const groups = !open ? "" : sy.groups.map((g) => {
+        const items = g.constructs.map((id) => W.byId[id]).filter(Boolean);
+        return "<h5>" + esc(g.name) + "</h5><ul>" + items.map((c) => '<li><a href="' + href(c.id) + '"' + (c.id === activeId ? ' class="on"' : "") + ">" + esc(c.name) +
+          (c.status === "spec" ? "<small>spec</small>" : "") + "</a></li>").join("") + "</ul>";
+      }).join("");
+      return '<div class="nav-fam' + (open ? " open" : "") + '"><a class="nav-sys' + (open && !activeId ? " on" : "") + '" href="' + sysHref(sy.id) + '"><i style="background:var(' + sy.color + ')"></i><span>' + esc(sy.name) + "</span><small>" + n + "</small></a>" + groups + "</div>";
     }).join("");
-    const top = [["index", "index.html", "Atlas"], ["workbench", "workbench.html", "Workbench"], ["principles", "principles.html", "Principles"], ["threads", "threads.html", "Open threads"], ["glossary", "glossary.html", "Glossary"], ["about", "about.html", "About"]]
+    const top = [["index", "index.html", "Atlas"], ["workbench", "workbench.html", "Workbench"], ["notes", "notes.html", "Notes & bugs"], ["threads", "threads.html", "Open threads"], ["principles", "principles.html", "Principles"], ["glossary", "glossary.html", "Glossary"], ["about", "about.html", "About"]]
       .map(([k, u, l]) => '<a href="' + u + '"' + (k === activeTop ? ' class="on"' : "") + ">" + l + "</a>").join("");
     const side = document.createElement("aside");
     side.className = "side";
@@ -184,7 +206,7 @@
       '<a class="brand" href="index.html"><b>CONSTRUCT ATLAS</b><span>mechanisms we have built &amp; imagined</span></a>' +
       '<input class="search" type="search" placeholder="Search constructs, terms…" aria-label="Search">' +
       '<nav class="nav-top">' + top + "</nav>" +
-      '<div class="nav-fams">' + fams + '<button class="theme-btn" type="button">light / dark</button></div>';
+      '<div class="nav-fams"><h4>Systems</h4>' + fams + '<button class="theme-btn" type="button">light / dark</button></div>';
     side.querySelector(".menu-btn").onclick = () => side.classList.toggle("open");
     side.querySelector(".theme-btn").onclick = toggleTheme;
     const search = side.querySelector(".search");
@@ -212,7 +234,7 @@
     const sib = W.list.filter((x) => x.family === c.family);
     const i = sib.indexOf(c), prev = sib[i - 1], next = sib[i + 1];
 
-    let h = '<div class="kicker"><a href="index.html#' + esc(f.id) + '" style="color:var(' + f.color + ')">' + esc(f.name) + "</a></div>";
+    let h = '<div class="kicker"><a href="' + sysHref(f.id) + '" style="color:var(' + f.color + ')">' + esc(f.name) + "</a><span>\u203a</span><span>" + esc(c.group) + "</span></div>";
     h += "<h1>" + esc(c.name) + "</h1>";
     h += '<p class="lede">' + links(c.summary) + "</p>";
     h += '<div class="meta-row">' + statusChip(c) + originChip(c) + (c.tags || []).map((t) => '<a class="chip origin" href="index.html?q=' + encodeURIComponent(t) + '">' + esc(t) + "</a>").join("") + "</div>";
@@ -246,11 +268,13 @@
     if (c.sources && c.sources.length) h += section("Where it lives", '<ul class="sources">' + c.sources.map((s) => "<li>" + sourceLink(s) + "</li>").join("") + "</ul>");
     const back = [...(c._back || [])].filter((x) => !rel.some((r) => r.id === x));
     if (back.length) h += section("Mentioned by", '<p class="sources">' + back.map((b) => '<a href="' + href(b) + '">' + esc(W.byId[b].name) + "</a>").join(" · ") + "</p>");
+    h += '<div id="notes-slot"></div>';
     h += "</div><hr>";
     h += '<p class="sources">' + (prev ? '← <a href="' + href(prev.id) + '">' + esc(prev.name) + "</a>" : "") +
       (prev && next ? " &nbsp;·&nbsp; " : "") + (next ? '<a href="' + href(next.id) + '">' + esc(next.name) + "</a> →" : "") + "</p>";
     main.innerHTML = h;
     if (c.toy) Toy.mount(document.getElementById("toy-slot"), c.toy);
+    if (window.AtlasNotes) AtlasNotes.mountConstruct(document.getElementById("notes-slot"), c, main);
   }
 
   // --------------------------------------------------------------- index
@@ -261,6 +285,55 @@
     return '<a class="card" style="--fam:var(' + f.color + ')" href="' + href(c.id) + '" data-hay="' + esc(hay) + '" data-status="' + esc(c.status) + '" data-origin="' + esc(c.origin) + '">' +
       (c.toy ? '<canvas class="thumb" data-id="' + esc(c.id) + '" style="width:100%;aspect-ratio:' + (c.toy.w || 384) + "/" + (c.toy.h || 216) + ';display:block;image-rendering:pixelated;background:var(--bg);border:1px solid var(--rule)"></canvas>' : "") +
       "<b>" + esc(c.name) + "</b><p>" + plain(c.summary) + '</p><div class="chips">' + statusChip(c) + originChip(c) + "</div></a>";
+  }
+
+  function groupsHTML(sy) {
+    return sy.groups.map((g) => {
+      const items = g.constructs.map((id) => W.byId[id]).filter(Boolean);
+      if (!items.length) return "";
+      return '<div class="grp-block"><h3 class="grp">' + esc(g.name) + '</h3><div class="cards">' + items.map(cardHTML).join("") + "</div></div>";
+    }).join("");
+  }
+
+  // Thumbnails: a still frame of each toy, drawn once it scrolls into view.
+  function thumbs(root) {
+    const io = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) {
+        io.unobserve(e.target);
+        Toy.thumbnail(e.target, W.byId[e.target.dataset.id].toy);
+      }
+    }, { rootMargin: "200px" });
+    root.querySelectorAll("canvas.thumb").forEach((cv) => io.observe(cv));
+    document.addEventListener("wiki:theme", () => root.querySelectorAll("canvas.thumb").forEach((cv) => Toy.thumbnail(cv, W.byId[cv.dataset.id].toy)));
+  }
+
+  // -------------------------------------------------------------- system
+
+  function renderSystem(main) {
+    const sy = W.systems.find((x) => x.id === new URLSearchParams(location.search).get("s"));
+    if (!sy) { main.innerHTML = '<h1>Not found</h1><p><a href="index.html">Back to the atlas.</a></p>'; return; }
+    document.title = sy.name + " \u00b7 Construct Atlas";
+    const items = W.list.filter((c) => c.family === sy.id);
+    const counts = {};
+    for (const c of items) counts[c.status] = (counts[c.status] || 0) + 1;
+    const qs = items.reduce((a, c) => a + (c.questions || []).length, 0);
+    let h = '<div class="kicker" style="color:var(' + sy.color + ')">System</div><h1>' + esc(sy.name) + "</h1>";
+    h += '<p class="lede">' + esc(sy.blurb) + "</p>";
+    h += '<div class="meta-row">' + ["built", "partial", "spec", "superseded"].filter((k) => counts[k]).map((k) => statusChip({ status: k }).replace("</span>", " " + counts[k] + "</span>")).join("") +
+      '<a class="chip origin" href="threads.html#' + esc(sy.id) + '">' + qs + " open questions</a></div>";
+    h += '<div class="prose">' + links(sy.overview || "") + "</div>";
+    if (sy.loop) h += '<div class="loop" style="--fam:var(' + sy.color + ')"><b>How the parts feed each other</b>' + links(sy.loop) + "</div>";
+    h += '<section class="fam-block" style="--fam:var(' + sy.color + ')">' + groupsHTML(sy) + "</section>";
+    const i = W.systems.indexOf(sy), prev = W.systems[i - 1], next = W.systems[i + 1];
+    h += '<hr><p class="sources">' + (prev ? '\u2190 <a href="' + sysHref(prev.id) + '">' + esc(prev.name) + "</a>" : "") + (prev && next ? " &nbsp;\u00b7&nbsp; " : "") +
+      (next ? '<a href="' + sysHref(next.id) + '">' + esc(next.name) + "</a> \u2192" : "") + "</p>";
+    h += '<div class="prose"><div id="notes-slot"></div></div>';
+    main.innerHTML = h;
+    thumbs(main);
+    if (window.AtlasNotes) {
+      AtlasNotes.mountConstruct(document.getElementById("notes-slot"), { id: sy.id, name: sy.name }, main);
+      AtlasNotes.decorate(main);
+    }
   }
 
   function renderIndex(main, search) {
@@ -278,11 +351,14 @@
       '<span style="width:12px"></span>' +
       [["all", "Both repos"], ["playground", "Playground"], ["shmuprouge", "ShmupRouge"]].map(([k, l], i) => '<button class="btn' + (i ? "" : " on") + '" data-f="origin" data-v="' + k + '">' + l + "</button>").join("") +
       "</div></div>";
-    for (const f of W.families) {
-      const items = W.list.filter((c) => c.family === f.id);
-      if (!items.length) continue;
-      h += '<section class="fam-block" id="' + esc(f.id) + '" style="--fam:var(' + f.color + ')"><div class="fam-head"><h2>' + esc(f.name) + "</h2><p>" + esc(f.blurb || "") + '</p></div><div class="cards">' +
-        items.map(cardHTML).join("") + "</div></section>";
+    h += '<div class="sys-tiles">' + W.systems.map((sy) => {
+      const n = W.list.filter((c) => c.family === sy.id).length;
+      return '<a class="sys-tile" style="--fam:var(' + sy.color + ')" href="' + sysHref(sy.id) + '"><b>' + esc(sy.name) + "</b><span>" + esc(sy.blurb) + "</span><small>" + n + " constructs \u00b7 " + sy.groups.map((g) => esc(g.name)).join(", ") + "</small></a>";
+    }).join("") + "</div>";
+    for (const sy of W.systems) {
+      if (!W.list.some((c) => c.family === sy.id)) continue;
+      h += '<section class="fam-block" id="' + esc(sy.id) + '" style="--fam:var(' + sy.color + ')"><div class="fam-head"><h2><a href="' + sysHref(sy.id) + '">' + esc(sy.name) + "</a></h2><p>" + esc(sy.blurb || "") + "</p></div>" +
+        groupsHTML(sy) + "</section>";
     }
     main.innerHTML = h;
 
@@ -295,7 +371,9 @@
           (!q || q.split(/\s+/).every((w) => card.dataset.hay.includes(w)));
         card.classList.toggle("hidden", !ok);
       }
+      for (const b of main.querySelectorAll(".grp-block")) b.classList.toggle("hidden", !b.querySelector(".card:not(.hidden)"));
       for (const b of main.querySelectorAll(".fam-block")) b.classList.toggle("hidden", !b.querySelector(".card:not(.hidden)"));
+      main.querySelector(".sys-tiles").classList.toggle("hidden", !!q || filt.status !== "all" || filt.origin !== "all");
     }
     main.querySelectorAll(".filters .btn").forEach((b) => b.onclick = () => {
       filt[b.dataset.f] = b.dataset.v;
@@ -306,16 +384,8 @@
     if (q0) { search.value = q0; filt.q = q0; apply(); }
     search.addEventListener("input", () => { filt.q = search.value; apply(); });
 
-    // Thumbnails: a still frame of each toy, drawn once it scrolls into view.
-    const io = new IntersectionObserver((es) => {
-      for (const e of es) if (e.isIntersecting) {
-        io.unobserve(e.target);
-        const c = W.byId[e.target.dataset.id];
-        Toy.thumbnail(e.target, c.toy);
-      }
-    }, { rootMargin: "200px" });
-    main.querySelectorAll("canvas.thumb").forEach((cv) => io.observe(cv));
-    document.addEventListener("wiki:theme", () => main.querySelectorAll("canvas.thumb").forEach((cv) => Toy.thumbnail(cv, W.byId[cv.dataset.id].toy)));
+    thumbs(main);
+    if (window.AtlasNotes) AtlasNotes.decorate(main);
     if (window.AtlasHero) window.AtlasHero(document.getElementById("hero"));
   }
 
@@ -356,7 +426,7 @@
     for (const f of W.families) {
       const items = W.list.filter((c) => c.family === f.id && c.questions && c.questions.length);
       if (!items.length) continue;
-      h += '<section class="fam-block" style="--fam:var(' + f.color + ')"><div class="fam-head"><h2>' + esc(f.name) + "</h2></div>";
+      h += '<section class="fam-block" id="' + esc(f.id) + '" style="--fam:var(' + f.color + ')"><div class="fam-head"><h2><a href="' + sysHref(f.id) + '">' + esc(f.name) + "</a></h2></div>";
       for (const c of items) {
         h += '<div class="thread" data-hay="' + esc((c.name + " " + c.questions.join(" ")).toLowerCase()) + '"><h3><a href="' + href(c.id) + '">' + esc(c.name) + "</a> " + statusChip(c) + '</h3><ul class="questions">' +
           c.questions.map((q) => "<li>" + links(q) + "</li>").join("") + "</ul></div>";
@@ -382,8 +452,8 @@
     const locked = [false, false, false];
     const sparkIx = [0, 0, 0];
     let h = '<div class="kicker">Designing with the atlas</div><h1>Workbench</h1>';
-    h += '<p class="lede">Draw three constructs from different families, lock the ones that interest you, and redraw the rest. The prompt underneath asks what game the three make together. Most draws are nonsense; the point is the one that is not.</p>';
-    h += '<div class="filters"><button class="btn" id="wb-draw">draw unlocked</button><label class="toy-ctl"><input type="checkbox" id="wb-mix" checked> one per family</label></div>';
+    h += '<p class="lede">Draw three constructs from different systems, lock the ones that interest you, and redraw the rest. The prompt underneath asks what game the three make together. Most draws are nonsense; the point is the one that is not.</p>';
+    h += '<div class="filters"><button class="btn" id="wb-draw">draw unlocked</button><label class="toy-ctl"><input type="checkbox" id="wb-mix" checked> one per system</label></div>';
     h += '<div class="bench-grid" id="wb-grid"></div><div class="prompt-box" id="wb-prompt"></div>';
     h += '<div class="prose"><h2>How to use a draw</h2><ol>' +
       "<li>Read each construct's <em>why it exists</em>. Ask what feeling the three intents produce together, not what the mechanics add up to.</li>" +
@@ -425,9 +495,12 @@
   W.page = async function (kind) {
     initTheme();
     await loadAll();
-    const { main, search } = shell(kind === "construct" ? new URLSearchParams(location.search).get("c") : null, kind);
+    const qp = new URLSearchParams(location.search);
+    const { main, search } = shell(kind === "construct" ? qp.get("c") : null, kind, kind === "system" ? qp.get("s") : null);
     if (kind === "construct") renderConstruct(main);
     else if (kind === "index") renderIndex(main, search);
+    else if (kind === "system") renderSystem(main);
+    else if (kind === "notes") { if (window.AtlasNotes) AtlasNotes.renderAll(main, search); }
     else if (kind === "glossary") renderGlossary(main, search);
     else if (kind === "workbench") renderWorkbench(main);
     else if (kind === "about" || kind === "principles") { const t = document.getElementById("about"); main.innerHTML = links(t.innerHTML); t.remove(); }

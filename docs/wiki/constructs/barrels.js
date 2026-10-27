@@ -37,7 +37,6 @@
   Wiki.construct({
     id: "barrels",
     name: "Barrel transforms",
-    family: "weapons",
     origin: "playground",
     status: "partial",
     statusNote: "Twelve Barrel subclasses are built in the MWS v2 runtime. Oscillating, Zig-zag, Mixer, Revolver and Random are spec only: the last three need several inputs, which the single-parent graph cannot express yet. Rotating behaves differently from its spec description.",

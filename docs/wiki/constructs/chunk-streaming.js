@@ -23,7 +23,6 @@
   Wiki.construct({
     id: "chunk-streaming",
     name: "Chunk streaming on a wrapping world",
-    family: "generation",
     origin: "shmuprouge",
     status: "built",
     summary: "The world is a toroidal grid of 256-WU chunks; only those around the camera are simulated, each with a two-cell halo copied from its neighbours, while everything else is frozen in a cache exactly as it was left.",

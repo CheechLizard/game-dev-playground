@@ -17,7 +17,6 @@ function badSquad(S, P, kit) {
 Wiki.construct({
   id: "build-and-defend",
   name: "Build and defend",
-  family: "structure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built as the tutorial's last two objectives. The gate build is a plain 30 s timer: how much matter you delivered does not change it, and the gate has no health of its own.",

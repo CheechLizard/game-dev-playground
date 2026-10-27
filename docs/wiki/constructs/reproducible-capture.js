@@ -28,7 +28,6 @@
   Wiki.construct({
     id: "reproducible-capture",
     name: "Byte-reproducible scripted screenshots",
-    family: "tooling",
     origin: "playground",
     status: "built",
     statusNote: "Built and used after every drawn change. Known gaps: <code>--set overlay.*</code> draws nothing, and in run mode any <code>--at</code> of 30 s or more lands on the shop.",

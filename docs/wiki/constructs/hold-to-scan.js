@@ -4,7 +4,6 @@ var HTS_WU = 2, HTS_AX = 236, HTS_AY = 112;
 Wiki.construct({
   id: "hold-to-scan",
   name: "Hold to scan",
-  family: "structure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built as a reusable <code>Proximity</code> object; the game uses it once, for the tutorial's artifact scan.",

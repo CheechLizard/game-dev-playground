@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "pickup-magnet",
   name: "Pickup radius and homing",
-  family: "body",
   origin: "playground",
   status: "built",
   summary: "Drops scatter, settle, and once inside the player's pickup radius latch on and fly in, speeding up as they close; gold, health and weapons expire after 20 s, LP never does.",

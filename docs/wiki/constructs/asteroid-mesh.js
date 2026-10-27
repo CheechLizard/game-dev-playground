@@ -61,7 +61,6 @@ function asmBuild(S) {
 Wiki.construct({
   id: "asteroid-mesh",
   name: "Asteroid mesh",
-  family: "world",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built through implementation phases 1-5 and 7 of 8: points, triangulation, Voronoi dual, chunk index, parallax and terrain use, and the navigation graph. Not built: updating the mesh when an asteroid is destroyed (the mesh-surgery plan), the level-map view, and gameplay uses beyond spider navigation.",

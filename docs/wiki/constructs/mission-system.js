@@ -38,7 +38,6 @@ function msnComplete(S, kit) {
 Wiki.construct({
   id: "mission-system",
   name: "Mission system: the objective chain",
-  family: "structure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built and running the whole Level 1 tutorial, but linear only: no branching <code>next</code>, no fail conditions, no multi-mission, and mission end is a TODO. Two beats are still special-cased by id in Lua.",

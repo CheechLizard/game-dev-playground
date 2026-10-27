@@ -32,7 +32,6 @@ function ssaBreach(S) {
 Wiki.construct({
   id: "solar-system-arena",
   name: "Solar System Arena",
-  family: "structure",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Built: planets as concentric material rings with craters, a radial gravity attractor per planet, inside a toroidal arena. Not built: the sun, plasma, heat zones, Solar Dragons, the six planet archetypes, and every physics-consequence gate. Materials carry <code>hardness</code> and <code>explosive</code> values, but no code reads them.",

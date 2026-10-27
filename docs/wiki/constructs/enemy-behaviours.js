@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "enemy-behaviours",
   name: "Enemy behaviours",
-  family: "agents",
   origin: "playground",
   status: "built",
   statusNote: "Four behaviours across six enemies, all built. A behaviour is fixed per enemy at load; the editor cannot switch it at runtime.",

@@ -46,7 +46,6 @@
   Wiki.construct({
     id: "headless-sim",
     name: "Headless simulation and split random streams",
-    family: "tooling",
     origin: "playground",
     status: "built",
     summary: "The run is a pure model that takes a time step and a movement vector and never draws or reads input, and its randomness is split by purpose, so a seed replays a whole run without a window and cosmetic changes cannot reshuffle gameplay.",

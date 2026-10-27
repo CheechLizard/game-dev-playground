@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "aim-lead",
   name: "Aim prediction",
-  family: "body",
   origin: "playground",
   status: "built",
   summary: "Auto-aimed weapons fire at where a moving target will be when the shot arrives, solved in three iterations and scaled by a 0..1 lead factor; at zero they fire at where it is, which misses anything crossing.",

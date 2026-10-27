@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "fuel",
   name: "Fuel: kill to keep flying",
-  family: "economy",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only (docs/design/Fuel.md and Solar_System_Arena.md). No fuel code, data or HUD exists; every parameter is TBD.",

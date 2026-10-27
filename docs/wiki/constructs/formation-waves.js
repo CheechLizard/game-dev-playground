@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "formation-waves",
   name: "Formation waves: the Menagerie Director",
-  family: "pressure",
   origin: "shmuprouge",
   status: "built",
   statusNote: "Built, code only: no design document describes it. It runs only on the <code>menagerie</code> level and is inert everywhere else.",

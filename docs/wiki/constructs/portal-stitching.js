@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "portal-stitching",
   name: "Portal stitching: the direction you fly in picks the boss",
-  family: "structure",
   origin: "shmuprouge",
   status: "spec",
   statusNote: "Spec only, in two competing versions: a directional portal bubble with material-locked directions (Portal_Stitching.md, Solar_System_Arena.md) and a portal built at a construction site for a resource cost (Levels_Overview.md). No portal code exists; CorridorBounds, the non-wrapping bounds a corridor would use, is never instantiated and has no diagonal mode.",

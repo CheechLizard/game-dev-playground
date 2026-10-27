@@ -32,7 +32,6 @@
   Wiki.construct({
     id: "falling-sand",
     name: "Falling sand that floats: Margolus blocks with field gravity",
-    family: "world",
     origin: "shmuprouge",
     status: "built",
     summary: "A cellular automaton that moves sand in 2×2 blocks, turning each block toward the local gravity vector, so one rule set gives floating dust in space, heaps on a planet and spirals round a black hole.",

@@ -1,4 +1,5 @@
-/* Copy this file to constructs/<id>.js, add <id> to manifest.js, and fill it in.
+/* Copy this file to constructs/<id>.js, add <id> to manifest.js under its system
+ * and group (placement lives only there), and fill it in.
  * Not listed in the manifest, so it never renders.
  *
  * Prose fields are HTML. [[other-id]] or [[other-id|label]] links another
@@ -11,7 +12,6 @@
 Wiki.construct({
   id: "example-construct",
   name: "Example construct",
-  family: "pressure",              // an id from manifest.js families
   origin: "playground",            // playground | shmuprouge | both
   status: "spec",                  // built | partial | spec | superseded
   statusNote: "",                  // optional: what is and is not built, in a line or two

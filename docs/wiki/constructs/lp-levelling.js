@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "lp-levelling",
   name: "LP levelling with an automatic stat bump",
-  family: "economy",
   origin: "playground",
   status: "built",
   summary: "Every kill drops LP that never expires; a geometric-plus-flat curve turns it into levels, and each level adds a fixed bundle of stats with no choice attached.",

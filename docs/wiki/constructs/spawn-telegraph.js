@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "spawn-telegraph",
   name: "Spawn warning ring",
-  family: "pressure",
   origin: "playground",
   status: "built",
   statusNote: "Built (commit af40f13). In a normal run spawns are off-screen, so the ring is mostly seen near arena walls and in the zoo.",

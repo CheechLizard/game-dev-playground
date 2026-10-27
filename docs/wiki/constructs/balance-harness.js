@@ -82,7 +82,6 @@
   Wiki.construct({
     id: "balance-harness",
     name: "Balance harness with a scripted pilot",
-    family: "tooling",
     origin: "playground",
     status: "built",
     statusNote: "Built and the main balance instrument. It reads schema defaults, not the startup profile, unless given <code>--profile</code>, so it currently measures enemy speeds the shipped game does not use.",

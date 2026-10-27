@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "escalation-curve",
   name: "Escalation curve",
-  family: "pressure",
   origin: "playground",
   status: "built",
   summary: "Enemy HP, damage, speed and LP value compound per wave index, elites are rolled per spawn on top, and the player's own level contributes nothing by default.",

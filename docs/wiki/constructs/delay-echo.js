@@ -9,7 +9,6 @@
   Wiki.construct({
     id: "delay-echo",
     name: "Delay echo",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "Built in the MWS v2 runtime; the <em>Delayed single</em> bench preset (Single &rarr; Delay 60 &rarr; Battery &rarr; Seeking &rarr; Ranged) shows it. Delay units and rounding are an open spec decision; the code uses integer ticks.",

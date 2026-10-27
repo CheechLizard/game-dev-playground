@@ -42,7 +42,6 @@
   Wiki.construct({
     id: "trigger-chain",
     name: "Trigger signal chain",
-    family: "weapons",
     origin: "playground",
     status: "built",
     statusNote: "All nine Trigger subclasses run in the MWS v2 runtime, playable in the F8 bench. Proximity departs from the spec: it uses its own sensor radius and ignores its input bit. Event batching (several Hits in one tick) is still an open decision; the runtime gives each event its own context.",

@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "crowd-separation",
   name: "Crowd separation and knockback",
-  family: "agents",
   origin: "playground",
   status: "built",
   statusNote: "Built. Finding from reading the code: only pairs in the same 16 px cell are separated, so overlaps across a cell edge are never resolved.",

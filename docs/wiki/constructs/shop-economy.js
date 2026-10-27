@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "shop-economy",
   name: "Shop economy: gold, offers and rerolls",
-  family: "economy",
   origin: "playground",
   status: "built",
   statusNote: "Built and balanced against a scripted pilot that never rerolls. The open problem it has surfaced, Blaster dominance, is not solved.",

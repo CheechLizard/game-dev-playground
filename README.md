@@ -6,8 +6,10 @@ and config profiles.
 
 The [Construct Atlas](docs/wiki/index.html) is the illustrated design wiki: every
 mechanism explored here and in ShmupRouge, one page each, with a playable toy.
-Serve the repo root (`python3 -m http.server`) and visit `/docs/wiki/`; opening
-`docs/wiki/index.html` from disk also works, but browsers then refuse the pixel fonts.
+Run `python3 docs/wiki/server.py` from the repo root and visit
+`http://localhost:8765/docs/wiki/`. The server also saves the notes and bug reports
+you write from the pages, as Markdown files in `docs/wiki/notes/`. Opening
+`docs/wiki/index.html` from disk works for reading, without the pixel fonts or notes.
 
 The revised [Modular Weapon System specification](docs/Modular_Weapon_System.md)
 and its [module interaction flow chart (SVG)](docs/diagrams/modular-weapon-system.svg)

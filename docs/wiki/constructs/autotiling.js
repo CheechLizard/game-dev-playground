@@ -34,7 +34,6 @@
   Wiki.construct({
     id: "autotiling",
     name: "Blob autotiling and the in-game tile editor",
-    family: "generation",
     origin: "shmuprouge",
     status: "built",
     statusNote: "Single-LOD autotiling of 32-WU tiles is built; the multi-LOD design is superseded. The in-game editor has pencil, eraser, planet creation and save, but no line, rectangle, ellipse, bucket or undo.",

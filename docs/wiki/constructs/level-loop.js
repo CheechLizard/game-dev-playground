@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "level-loop",
   name: "Level loop: arena, corridor, boss, store",
-  family: "structure",
   origin: "shmuprouge",
   status: "partial",
   statusNote: "Only the arena is built: a level JSON sets its size in 256-wu chunks and ArenaBounds wraps positions and distances toroidally. There is no corridor, boss or store stage, no stage transition and no backtracking; CorridorBounds exists but nothing creates one.",

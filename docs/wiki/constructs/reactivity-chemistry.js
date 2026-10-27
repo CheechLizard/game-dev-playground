@@ -39,7 +39,6 @@
   Wiki.construct({
     id: "reactivity-chemistry",
     name: "Reactivities: chemistry as level design",
-    family: "world",
     origin: "shmuprouge",
     status: "partial",
     statusNote: "Only acid erosion and dissolution are built, as hard-coded shader rules. The eight reactivities, the heat field, the effect profile and the biome primary/secondary scheme of <code>docs/world/Materials.md</code> v0.3 are spec only.",

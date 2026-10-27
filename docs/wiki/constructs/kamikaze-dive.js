@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "kamikaze-dive",
   name: "Kamikaze: pace slots and the dive",
-  family: "agents",
   origin: "shmuprouge",
   status: "built",
   summary: "Kamikazes fly in to fixed slots on an arc ahead of the scrolling player, keep pace forward only, lock a targeting laser, then dive one after another with lead.",

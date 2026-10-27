@@ -19,7 +19,6 @@
   Wiki.construct({
     id: "inspection-levels",
     name: "Inspection levels: zoo, range and bench",
-    family: "tooling",
     origin: "playground",
     status: "built",
     summary: "Purpose-built levels that run the real simulation one subject at a time: a cage per enemy, a room per weapon, a bench for weapon graphs, each tuned from an editable placard in the corridor and tested by walking in.",

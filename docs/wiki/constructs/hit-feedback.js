@@ -1,7 +1,6 @@
 Wiki.construct({
   id: "hit-feedback",
   name: "Bounded combat feedback",
-  family: "feel",
   origin: "playground",
   status: "built",
   statusNote: "Built for projectiles and MWS strikes. Static Field and Orbit Blades never call it. Damage numbers are a schema toggle with no implementation behind it. Four of the seven payload identities are reserved palette entries only.",

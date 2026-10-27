@@ -28,7 +28,6 @@
   Wiki.construct({
     id: "material-fx",
     name: "Material FX: depth darkening and per-material shimmer",
-    family: "feel",
     origin: "shmuprouge",
     status: "partial",
     statusNote: "Distance-to-empty interior darkening is built. The per-material FX weight texture (glow, liquid reflection, distortion) is spec only, and the hierarchical stability texturing it grew out of is superseded.",
