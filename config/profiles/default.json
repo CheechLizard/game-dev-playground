@@ -1,8 +1,9 @@
 {
   "description": "Schema defaults. Empty on purpose: profiles store only overrides.",
   "name": "default",
-  "savedAt": "2026-09-19T22:38:48Z",
+  "savedAt": "2026-09-28T05:26:17Z",
   "values": {
+    "bench.holdFire": true,
     "enemy.brute.chargeRange": 129.64285714286,
     "enemy.brute.chargeSpeed": 232.67857142857,
     "enemy.grunt.speed": 65.714285714286,
